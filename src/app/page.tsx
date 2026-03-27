@@ -1,65 +1,133 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useCallback, useRef } from 'react'
+import Canvas from '@/components/Canvas'
+import NodePopover from '@/components/NodePopover'
+import { findNearest } from '@/lib/nearest'
+import type { Node, Edge } from '@/types'
 
 export default function Home() {
+  const [nodes, setNodes] = useState<Node[]>([])
+  const [edges, setEdges] = useState<Edge[]>([])
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null)
+  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 })
+  const suppressNextCreateRef = useRef(false)
+
+  const onNodeCreate = useCallback((x: number, y: number) => {
+    if (suppressNextCreateRef.current) {
+      suppressNextCreateRef.current = false
+      return
+    }
+    const now = new Date().toISOString()
+    const newNode: Node = {
+      id: crypto.randomUUID(),
+      canvasId: 'local',
+      text: null,
+      url: null,
+      x,
+      y,
+      createdAt: now,
+      updatedAt: now,
+    }
+    setNodes((prev) => {
+      const nearest = findNearest(prev, x, y)
+      if (nearest) {
+        const edge: Edge = {
+          id: crypto.randomUUID(),
+          canvasId: 'local',
+          fromId: nearest.id,
+          toId: newNode.id,
+          createdAt: now,
+        }
+        setEdges((e) => [...e, edge])
+      }
+      return [...prev, newNode]
+    })
+    setSelectedNode(newNode)
+  }, [])
+
+  const onNodeCreateFromEdge = useCallback((sourceId: string, x: number, y: number) => {
+    const now = new Date().toISOString()
+    const newNode: Node = {
+      id: crypto.randomUUID(),
+      canvasId: 'local',
+      text: null,
+      url: null,
+      x,
+      y,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const edge: Edge = {
+      id: crypto.randomUUID(),
+      canvasId: 'local',
+      fromId: sourceId,
+      toId: newNode.id,
+      createdAt: now,
+    }
+    setNodes((prev) => [...prev, newNode])
+    setEdges((prev) => [...prev, edge])
+    setSelectedNode(newNode)
+  }, [])
+
+  const onNodeMove = useCallback((id: string, x: number, y: number) => {
+    setNodes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, x, y, updatedAt: new Date().toISOString() } : n))
+    )
+  }, [])
+
+  const onNodeSelect = useCallback((node: Node) => {
+    setSelectedNode(node)
+  }, [])
+
+  const onSave = useCallback((id: string, text: string) => {
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === id ? { ...n, text: text || null, updatedAt: new Date().toISOString() } : n
+      )
+    )
+  }, [])
+
+  const onDelete = useCallback((id: string) => {
+    setNodes((prev) => prev.filter((n) => n.id !== id))
+    setEdges((prev) => prev.filter((e) => e.fromId !== id && e.toId !== id))
+    setSelectedNode(null)
+  }, [])
+
+  // Called when an empty new node is dismissed — suppress the canvas click that follows
+  const onDiscard = useCallback((id: string) => {
+    setNodes((prev) => prev.filter((n) => n.id !== id))
+    setEdges((prev) => prev.filter((e) => e.fromId !== id && e.toId !== id))
+    setSelectedNode(null)
+    suppressNextCreateRef.current = true
+    // Auto-reset in case no canvas click follows (e.g. Escape key, clicking a node)
+    setTimeout(() => { suppressNextCreateRef.current = false }, 300)
+  }, [])
+
+  const selectedNodeCurrent =
+    selectedNode ? nodes.find((n) => n.id === selectedNode.id) ?? null : null
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="relative w-full h-screen overflow-hidden" style={{ background: '#0f172a' }}>
+      <Canvas
+        nodes={nodes}
+        edges={edges}
+        onNodeCreate={onNodeCreate}
+        onNodeCreateFromEdge={onNodeCreateFromEdge}
+        onNodeMove={onNodeMove}
+        onNodeSelect={onNodeSelect}
+        onTransformChange={setTransform}
+      />
+      {selectedNodeCurrent && (
+        <NodePopover
+          node={selectedNodeCurrent}
+          transform={transform}
+          onSave={onSave}
+          onDelete={onDelete}
+          onDiscard={onDiscard}
+          onClose={() => setSelectedNode(null)}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      )}
     </div>
-  );
+  )
 }
