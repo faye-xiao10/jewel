@@ -1,0 +1,70 @@
+import { NextResponse } from 'next/server'
+import { eq } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { nodes, edges } from '@/schema'
+import { findNearest } from '@/lib/nearest'
+import { withRetry } from '@/lib/retry'
+import type { Node } from '@/types'
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json()
+    const { canvasId, x, y, explicitFromId, text } = body
+
+    if (!canvasId || x == null || y == null) {
+      return NextResponse.json(
+        { error: 'canvasId, x, and y are required' },
+        { status: 400 }
+      )
+    }
+
+    const result = await withRetry(async () => {
+      const [node] = await db.insert(nodes).values({ canvasId, x, y, text: text ?? null }).returning()
+
+      let edge = null
+
+      if (explicitFromId) {
+        ;[edge] = await db
+          .insert(edges)
+          .values({ canvasId, fromId: explicitFromId, toId: node.id })
+          .returning()
+      } else {
+        const existing = await db
+          .select()
+          .from(nodes)
+          .where(eq(nodes.canvasId, canvasId))
+
+        const others: Node[] = existing
+          .filter((n) => n.id !== node.id)
+          .map((n) => ({
+            id: n.id,
+            canvasId: n.canvasId,
+            text: n.text,
+            url: n.url,
+            x: n.x,
+            y: n.y,
+            createdAt: n.createdAt.toISOString(),
+            updatedAt: n.updatedAt.toISOString(),
+          }))
+
+        const nearest = findNearest(others, x, y)
+        if (nearest) {
+          ;[edge] = await db
+            .insert(edges)
+            .values({ canvasId, fromId: nearest.id, toId: node.id })
+            .returning()
+        }
+      }
+
+      return { node, edge }
+    })
+
+    return NextResponse.json(result, { status: 201 })
+  } catch (error) {
+    console.error('[POST /api/nodes]', error)
+    return NextResponse.json(
+      { error: 'Failed to create node', detail: String(error) },
+      { status: 500 }
+    )
+  }
+}
