@@ -1,3 +1,10 @@
+export interface Canvas {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Node {
   id: string
   canvasId: string

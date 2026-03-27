@@ -309,6 +309,7 @@ export default function Canvas({
       ref={svgRef}
       className="w-full h-screen block"
       style={{ background: BG }}
+      onMouseDown={(e) => e.preventDefault()}  // ← add this
     />
   )
 }
