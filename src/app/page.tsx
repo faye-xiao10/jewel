@@ -47,8 +47,11 @@ export default function Home() {
   // Mirror nodes state so async callbacks can read current positions
   const nodesRef = useRef<Node[]>([])
   nodesRef.current = nodes
+  
   // Metadata for temp nodes pending their first DB write
   const tempMetaRef = useRef<Map<string, TempMeta>>(new Map())
+
+  const discardedRef = useRef<Set<string>>(new Set())
 
   // On mount: load or create canvas
   useEffect(() => {
@@ -137,6 +140,9 @@ export default function Home() {
   }, [])
 
   const onSave = useCallback(async (id: string, text: string) => {
+    if (discardedRef.current.has(id)) { discardedRef.current.delete(id); return }
+    suppressNextCreateRef.current = true   
+    setTimeout(() => { suppressNextCreateRef.current = false }, 300)
     const canvasId = canvasIdRef.current
     if (!canvasId) return
 
@@ -165,7 +171,7 @@ export default function Home() {
 
         // Replace temp node with real node
         setNodes((prev) => prev.map((n) => (n.id === id ? saved : n)))
-        setSelectedNode(saved)
+        setSelectedNode(null)
 
         // Replace temp edge with real edge (or remove it if API returned none)
         setEdges((prev) => {
@@ -215,6 +221,7 @@ export default function Home() {
 
   // Temp node dismissed without saving — just remove from local state, nothing in DB to clean up
   const onDiscard = useCallback((id: string) => {
+    discardedRef.current.add(id)
     const meta = tempMetaRef.current.get(id)
     setNodes((prev) => prev.filter((n) => n.id !== id))
     setEdges((prev) => {
