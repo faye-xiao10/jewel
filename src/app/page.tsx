@@ -214,7 +214,7 @@ export default function Home() {
             canvasId,
             x: node.x,
             y: node.y,
-            text: text || null,
+            text: text.trim() || null,
             ...(sessionColor ? { color: sessionColor, edgeColor: sessionColor } : {}),
             ...(meta.explicitFromId ? { explicitFromId: meta.explicitFromId } : {}),
           }),
@@ -245,7 +245,7 @@ export default function Home() {
     await fetch(`/api/nodes/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text || null }),
+      body: JSON.stringify({ text: text.trim() || null }),
     })
     return id
   }, [])
