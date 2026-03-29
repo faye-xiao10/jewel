@@ -2,21 +2,23 @@
 
 import { useEffect, useRef } from 'react'
 import type { Node } from '@/types'
+import type { CanvasSettings } from '@/lib/settings'
 
 interface NodePopoverProps {
   node: Node
   transform: { x: number; y: number; k: number }
+  settings: CanvasSettings
   onSave: (id: string, text: string) => Promise<string>
   onDelete: (id: string) => void
   onDiscard: (id: string) => void
   onClose: () => void
-  onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void  
-
+  onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
 }
 
 export default function NodePopover({
   node,
   transform,
+  settings,
   onSave,
   onDelete,
   onDiscard,
@@ -60,16 +62,15 @@ export default function NodePopover({
       const text = textareaRef.current?.value ?? ''
       if (!text.trim()) return
       const savedId = await onSave(node.id, text)
-      onNodeCreateFromEdge(savedId, node.x + 40, node.y + 40)
+      onNodeCreateFromEdge(savedId, node.x + settings.tabIndentX, node.y + settings.tabIndentY)
       return
     }
-    
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault()
       const text = textareaRef.current?.value ?? ''
       if (!text.trim()) return
       const savedId = await onSave(node.id, text)
-      onNodeCreateFromEdge(savedId, node.x + 0, node.y + 40)
+      onNodeCreateFromEdge(savedId, node.x, node.y + settings.shiftEnterIndentY)
       return
     }
   }
@@ -87,7 +88,6 @@ export default function NodePopover({
         background: '#1e293b',
         border: '1px solid #334155',
       }}
-      // Prevent blur from firing when clicking inside popover
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between px-3 pt-2 pb-1">
