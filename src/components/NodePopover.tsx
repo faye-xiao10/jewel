@@ -14,6 +14,8 @@ interface NodePopoverProps {
   onClose: () => void
   onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
   onNodeMove: (id: string, x: number, y: number) => void
+  onSubtreeSelect: (id: string) => void
+
 
 }
 
@@ -27,6 +29,7 @@ export default function NodePopover({
   onClose,
   onNodeCreateFromEdge,
   onNodeMove,
+  onSubtreeSelect, 
 }: NodePopoverProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -121,17 +124,24 @@ export default function NodePopover({
         placeholder="Type something…"
         className="w-full bg-transparent px-3 py-1 text-sm text-slate-100 placeholder-slate-500 resize-none outline-none"
       />
-      <div className="px-3 pb-2 pt-1">
+      <div className="flex px-1 ">
         <button
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onDelete(node.id)
-            onClose()
-          }}
-          className="w-full rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/30 transition-colors"
+          onClick={() => { onSubtreeSelect(node.id); onClose() }}
+          className="w-full rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-700 transition-colors mb-1"
         >
-          Delete node
+          Select subtree
         </button>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onDelete(node.id)
+              onClose()
+            }}
+            className="w-full rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/30 transition-colors"
+          >
+            Delete node
+          </button>
       </div>
     </div>
   )

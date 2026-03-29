@@ -18,6 +18,8 @@ interface CanvasProps {
   onNodeMultiSelect: (id: string, addToSelection: boolean) => void
   onClearSelection: () => void
   onTransformChange: (t: { x: number; y: number; k: number }) => void
+  onSubtreeSelect: (id: string) => void
+
 }
 
 const BG = '#0f172a'
@@ -54,6 +56,8 @@ export default function Canvas({
   onNodeMultiSelect,
   onClearSelection,
   onTransformChange,
+  onSubtreeSelect,
+
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const transformRef = useRef({ x: 0, y: 0, k: 1 })
@@ -345,9 +349,14 @@ export default function Canvas({
         const dx2 = event.x - ed.startX
         const dy2 = event.y - ed.startY
         if (Math.hypot(dx2, dy2) < 4) {
-          const addToSelection = (event.sourceEvent as MouseEvent).shiftKey
-          onNodeMultiSelect(d.id, addToSelection)
-          if (!addToSelection) onNodeSelect(d)
+          const isShift = (event.sourceEvent as MouseEvent).shiftKey
+          if (isShift) {
+            onSubtreeSelect(d.id)
+          } else {
+            onNodeMultiSelect(d.id, false)
+            onNodeSelect(d)
+          }
+
           return
         }
 
@@ -365,7 +374,8 @@ export default function Canvas({
       })
 
     nodeGroup.selectAll<SVGGElement, Node>('g.node').call(drag)
-  }, [nodes, edges, settings, selectedNodeIds, onNodeMove, onNodeMoveMulti, onNodeSelect, onNodeMultiSelect, onNodeCreateFromEdge, cancelEdgeDraw])
+  }, [nodes, edges, settings, selectedNodeIds, onNodeMove, onNodeMoveMulti, onNodeSelect, onNodeMultiSelect, onNodeCreateFromEdge, cancelEdgeDraw, onSubtreeSelect,
+  ])
 
   return (
     <svg

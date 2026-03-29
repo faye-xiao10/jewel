@@ -7,6 +7,7 @@ import SettingsPanel from '@/components/SettingsPanel'
 import { findNearest } from '@/lib/nearest'
 import { useSettings } from '@/lib/settings'
 import type { Node, Edge } from '@/types'
+import { getSubtreeIds } from '@/lib/subtree'
 
 const CANVAS_ID_KEY = 'jewel_canvas_id'
 
@@ -76,6 +77,10 @@ export default function Home() {
     }
     init()
   }, [])
+
+  const handleSubtreeSelect = useCallback((rootId: string) => {
+    setSelectedNodeIds(getSubtreeIds(rootId, edges))
+  }, [edges])
   
 
   const onNodeCreate = useCallback((x: number, y: number) => {
@@ -309,6 +314,8 @@ export default function Home() {
         onNodeMultiSelect={onNodeMultiSelect}
         onClearSelection={onClearSelection}
         onTransformChange={setTransform}
+        onSubtreeSelect={handleSubtreeSelect}
+
       />
       {selectedNodeCurrent && (
         <NodePopover
@@ -321,6 +328,7 @@ export default function Home() {
           onNodeCreateFromEdge={onNodeCreateFromEdge}
           settings={settings}
           onNodeMove={onNodeMove}
+          onSubtreeSelect={handleSubtreeSelect}
 
         />
       )}
