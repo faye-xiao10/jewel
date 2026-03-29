@@ -64,12 +64,13 @@ Drizzle ORM + Neon Postgres. All mutations backed by API routes. Write-on-save p
 - Question nodes: if `node.text` ends with `?`, node dot and label render in `questionColor`
 
 **Multi-select:**
-- Click a node = select it (shows ring), Shift+click = add/remove from selection
+- Shift+click a node = select entire subtree rooted at that node (BFS following directed edges)
 - Dragging a selected node when multiple are selected moves all together, PATCHes all on drag end
 - Click empty space clears selection
 - `selectedNodeIds: Set<string>` state in `page.tsx`, passed to Canvas as prop
 - Selection ring rendered as `circle.select-ring` in D3, opacity toggled by selection state
 - Small hint bar at bottom of screen: "N nodes selected · Press Delete to remove"
+- Subtree util in `src/lib/subtree.ts` — BFS from root following `fromId → toId` edges
 
 **Canvas Settings panel:**
 - Gear icon (top-right) opens settings panel
@@ -116,6 +117,7 @@ src/
     nearest.ts
     retry.ts
     settings.ts
+    subtree.ts
   schema/
     index.ts
   types/
