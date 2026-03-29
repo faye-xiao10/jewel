@@ -5,6 +5,7 @@ import Canvas from '@/components/Canvas'
 import NodePopover from '@/components/NodePopover'
 import SettingsPanel from '@/components/SettingsPanel'
 import { findNearest } from '@/lib/nearest'
+import { getSessionColor } from '@/lib/sessionColor'
 import { useSettings } from '@/lib/settings'
 import type { Node, Edge } from '@/types'
 import { getSubtreeIds } from '@/lib/subtree'
@@ -22,6 +23,7 @@ function toNode(raw: Record<string, unknown>): Node {
     canvasId: raw.canvasId as string,
     text: (raw.text as string | null) ?? null,
     url: (raw.url as string | null) ?? null,
+    color: (raw.color as string | null) ?? undefined,
     x: raw.x as number,
     y: raw.y as number,
     createdAt: raw.createdAt as string,
@@ -35,6 +37,7 @@ function toEdge(raw: Record<string, unknown>): Edge {
     canvasId: raw.canvasId as string,
     fromId: raw.fromId as string,
     toId: raw.toId as string,
+    color: (raw.color as string | null) ?? undefined,
     createdAt: raw.createdAt as string,
   }
 }
@@ -47,12 +50,17 @@ export default function Home() {
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 })
   const [loading, setLoading] = useState(true)
   const canvasIdRef = useRef<string | null>(null)
+  const sessionColorRef = useRef<string>('')
   const suppressNextCreateRef = useRef(false)
   const nodesRef = useRef<Node[]>([])
   nodesRef.current = nodes
   const tempMetaRef = useRef<Map<string, TempMeta>>(new Map())
   const discardedRef = useRef<Set<string>>(new Set())
   const { settings, updateSetting, resetSettings } = useSettings()
+
+  useEffect(() => {
+    sessionColorRef.current = getSessionColor()
+  }, [])
 
   useEffect(() => {
     async function init() {
@@ -67,7 +75,9 @@ export default function Home() {
           setLoading(false)
           return
         }
-        localStorage.removeItem(CANVAS_ID_KEY)
+        console.error('Failed to load canvas', stored, res.status)
+        setLoading(false)
+        return
       }
       const res = await fetch('/api/canvases', { method: 'POST' })
       const data = await res.json()
@@ -90,23 +100,22 @@ export default function Home() {
     }
     const canvasId = canvasIdRef.current
     if (!canvasId) return
-
+  
     const now = new Date().toISOString()
     const tempId = `temp_${Date.now()}`
-    const tempNode: Node = { id: tempId, canvasId, text: null, url: null, x, y, createdAt: now, updatedAt: now }
-
-    setNodes((prev) => {
-      const nearest = findNearest(prev.filter(n => !n.id.startsWith('temp_')), x, y)
-      if (nearest) {
-        const tempEdgeId = `temp_edge_${Date.now()}`
-        tempMetaRef.current.set(tempId, { tempEdgeId })
-        const tempEdge: Edge = { id: tempEdgeId, canvasId, fromId: nearest.id, toId: tempId, createdAt: now }
-        setEdges((e) => [...e, tempEdge])
-      } else {
-        tempMetaRef.current.set(tempId, {})
-      }
-      return [...prev, tempNode]
-    })
+    const color = sessionColorRef.current || undefined
+    const tempNode: Node = { id: tempId, canvasId, text: null, url: null, color, x, y, createdAt: now, updatedAt: now }
+  
+    const nearest = findNearest(nodesRef.current.filter(n => !n.id.startsWith('temp_')), x, y)
+    if (nearest) {
+      const tempEdgeId = `temp_edge_${Date.now()}`
+      tempMetaRef.current.set(tempId, { tempEdgeId })
+      const tempEdge: Edge = { id: tempEdgeId, canvasId, fromId: nearest.id, toId: tempId, color, createdAt: now }
+      setEdges((e) => [...e, tempEdge])
+    } else {
+      tempMetaRef.current.set(tempId, {})
+    }
+    setNodes((prev) => [...prev, tempNode])
     setSelectedNode(tempNode)
     setSelectedNodeIds(new Set())
   }, [])
@@ -118,8 +127,9 @@ export default function Home() {
     const now = new Date().toISOString()
     const tempId = `temp_${Date.now()}`
     const tempEdgeId = `temp_edge_${Date.now()}`
-    const tempNode: Node = { id: tempId, canvasId, text: null, url: null, x, y, createdAt: now, updatedAt: now }
-    const tempEdge: Edge = { id: tempEdgeId, canvasId, fromId: sourceId, toId: tempId, createdAt: now }
+    const color = sessionColorRef.current || undefined
+    const tempNode: Node = { id: tempId, canvasId, text: null, url: null, color, x, y, createdAt: now, updatedAt: now }
+    const tempEdge: Edge = { id: tempEdgeId, canvasId, fromId: sourceId, toId: tempId, color, createdAt: now }
 
     tempMetaRef.current.set(tempId, { explicitFromId: sourceId, tempEdgeId })
     setNodes((prev) => [...prev, tempNode])
@@ -196,6 +206,7 @@ export default function Home() {
       const meta = tempMetaRef.current.get(id) ?? {}
 
       try {
+        const sessionColor = sessionColorRef.current || undefined
         const res = await fetch('/api/nodes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -204,6 +215,7 @@ export default function Home() {
             x: node.x,
             y: node.y,
             text: text || null,
+            ...(sessionColor ? { color: sessionColor, edgeColor: sessionColor } : {}),
             ...(meta.explicitFromId ? { explicitFromId: meta.explicitFromId } : {}),
           }),
         })
@@ -306,6 +318,7 @@ export default function Home() {
         edges={edges}
         settings={settings}
         selectedNodeIds={selectedNodeIds}
+        sessionColor={sessionColorRef.current}
         onNodeCreate={onNodeCreate}
         onNodeCreateFromEdge={onNodeCreateFromEdge}
         onNodeMove={onNodeMove}
@@ -315,7 +328,6 @@ export default function Home() {
         onClearSelection={onClearSelection}
         onTransformChange={setTransform}
         onSubtreeSelect={handleSubtreeSelect}
-
       />
       {selectedNodeCurrent && (
         <NodePopover

@@ -10,6 +10,7 @@ interface CanvasProps {
   edges: Edge[]
   settings: CanvasSettings
   selectedNodeIds: Set<string>
+  sessionColor?: string
   onNodeCreate: (x: number, y: number) => void
   onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
   onNodeMove: (id: string, x: number, y: number) => void
@@ -19,7 +20,6 @@ interface CanvasProps {
   onClearSelection: () => void
   onTransformChange: (t: { x: number; y: number; k: number }) => void
   onSubtreeSelect: (id: string) => void
-
 }
 
 const BG = '#0f172a'
@@ -57,7 +57,6 @@ export default function Canvas({
   onClearSelection,
   onTransformChange,
   onSubtreeSelect,
-
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const transformRef = useRef({ x: 0, y: 0, k: 1 })
@@ -162,7 +161,7 @@ export default function Canvas({
       (exit) => exit.remove()
     )
 
-    edgeGroup.selectAll<SVGLineElement, Edge>('line.edge').attr('stroke', s.edgeColor)
+    edgeGroup.selectAll<SVGLineElement, Edge>('line.edge').attr('stroke', (d) => d.color ?? s.edgeColor)
 
     const nodeMap = new Map(nodesRef.current.map((n) => [n.id, n]))
     edgeGroup.selectAll<SVGLineElement, Edge>('line.edge').each(function (d) {
@@ -192,8 +191,8 @@ export default function Canvas({
     allNodes.attr('transform', (d) => `translate(${d.x},${d.y})`)
 
     allNodes.select('circle.node-circle')
-      .attr('fill', 'white')
-      .attr('stroke', (d) => (d.text?.endsWith('?') ? s.questionColor : s.nodeColor))
+      .attr('fill', (d) => d.color ?? s.nodeColor)
+      .attr('stroke', (d) => (d.text?.endsWith('?') ? s.questionColor : (d.color ?? s.nodeColor)))
       .attr('stroke-width', 2)
 
     allNodes.select('circle.select-ring')
@@ -230,6 +229,28 @@ export default function Canvas({
           .text(line)
       })
     })
+
+    allNodes
+      .on('mouseover', function (_, d) {
+        d3.select(this).select('.timestamp-label').remove()
+        const label = new Date(d.createdAt).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        })
+        d3.select(this)
+          .append('text')
+          .attr('class', 'timestamp-label')
+          .attr('x', 0)
+          .attr('y', NODE_R + 18)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', '9px')
+          .attr('fill', '#666')
+          .attr('opacity', 0.6)
+          .attr('pointer-events', 'none')
+          .text(label)
+      })
+      .on('mouseleave', function () {
+        d3.select(this).select('.timestamp-label').remove()
+      })
 
     nodeSel.exit().remove()
 
@@ -353,10 +374,8 @@ export default function Canvas({
           if (isShift) {
             onSubtreeSelect(d.id)
           } else {
-            onNodeMultiSelect(d.id, false)
             onNodeSelect(d)
           }
-
           return
         }
 
