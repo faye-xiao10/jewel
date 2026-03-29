@@ -6,10 +6,12 @@ import type { Node } from '@/types'
 interface NodePopoverProps {
   node: Node
   transform: { x: number; y: number; k: number }
-  onSave: (id: string, text: string) => void
+  onSave: (id: string, text: string) => Promise<string>
   onDelete: (id: string) => void
   onDiscard: (id: string) => void
   onClose: () => void
+  onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void  
+
 }
 
 export default function NodePopover({
@@ -19,6 +21,7 @@ export default function NodePopover({
   onDelete,
   onDiscard,
   onClose,
+  onNodeCreateFromEdge,
 }: NodePopoverProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -43,7 +46,7 @@ export default function NodePopover({
     onClose()
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+  async function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       commit(false)
@@ -51,6 +54,23 @@ export default function NodePopover({
     if (e.key === 'Escape') {
       if (node.text === null) onDelete(node.id)
       onClose()
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const text = textareaRef.current?.value ?? ''
+      if (!text.trim()) return
+      const savedId = await onSave(node.id, text)
+      onNodeCreateFromEdge(savedId, node.x + 40, node.y + 40)
+      return
+    }
+    
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault()
+      const text = textareaRef.current?.value ?? ''
+      if (!text.trim()) return
+      const savedId = await onSave(node.id, text)
+      onNodeCreateFromEdge(savedId, node.x + 0, node.y + 40)
+      return
     }
   }
 
@@ -81,6 +101,7 @@ export default function NodePopover({
         </button>
       </div>
       <textarea
+        key={node.id}
         ref={textareaRef}
         defaultValue={node.text ?? ''}
         onKeyDown={handleKeyDown}

@@ -44,16 +44,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const canvasIdRef = useRef<string | null>(null)
   const suppressNextCreateRef = useRef(false)
-  // Mirror nodes state so async callbacks can read current positions
   const nodesRef = useRef<Node[]>([])
   nodesRef.current = nodes
-  
-  // Metadata for temp nodes pending their first DB write
   const tempMetaRef = useRef<Map<string, TempMeta>>(new Map())
-
   const discardedRef = useRef<Set<string>>(new Set())
 
-  // On mount: load or create canvas
   useEffect(() => {
     async function init() {
       const stored = localStorage.getItem(CANVAS_ID_KEY)
@@ -78,7 +73,6 @@ export default function Home() {
     init()
   }, [])
 
-  // Add temp node to local state only — no DB write yet
   const onNodeCreate = useCallback((x: number, y: number) => {
     if (suppressNextCreateRef.current) {
       suppressNextCreateRef.current = false
@@ -106,7 +100,6 @@ export default function Home() {
     setSelectedNode(tempNode)
   }, [])
 
-  // Add temp node + temp edge to local state only — no DB write yet
   const onNodeCreateFromEdge = useCallback((sourceId: string, x: number, y: number) => {
     const canvasId = canvasIdRef.current
     if (!canvasId) return
@@ -139,17 +132,16 @@ export default function Home() {
     setSelectedNode(node)
   }, [])
 
-  const onSave = useCallback(async (id: string, text: string) => {
-    if (discardedRef.current.has(id)) { discardedRef.current.delete(id); return }
-    suppressNextCreateRef.current = true   
+  const onSave = useCallback(async (id: string, text: string): Promise<string> => {
+    if (discardedRef.current.has(id)) { discardedRef.current.delete(id); return id }
+    suppressNextCreateRef.current = true
     setTimeout(() => { suppressNextCreateRef.current = false }, 300)
     const canvasId = canvasIdRef.current
-    if (!canvasId) return
+    if (!canvasId) return id
 
     if (id.startsWith('temp_')) {
-      // First save — write to DB now
       const node = nodesRef.current.find((n) => n.id === id)
-      if (!node) return
+      if (!node) return id
       const meta = tempMetaRef.current.get(id) ?? {}
 
       try {
@@ -169,11 +161,7 @@ export default function Home() {
         const saved = toNode(realNode)
         const savedEdge = realEdge ? toEdge(realEdge) : null
 
-        // Replace temp node with real node
         setNodes((prev) => prev.map((n) => (n.id === id ? saved : n)))
-        setSelectedNode(null)
-
-        // Replace temp edge with real edge (or remove it if API returned none)
         setEdges((prev) => {
           const without = meta.tempEdgeId
             ? prev.filter((e) => e.id !== meta.tempEdgeId)
@@ -182,13 +170,12 @@ export default function Home() {
         })
 
         tempMetaRef.current.delete(id)
+        return saved.id
       } catch {
-        // Leave temp node in place — user can try saving again
+        return id
       }
-      return
     }
 
-    // Existing node — just patch text
     setNodes((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, text: text || null, updatedAt: new Date().toISOString() } : n
@@ -199,6 +186,7 @@ export default function Home() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text || null }),
     })
+    return id
   }, [])
 
   const onDelete = useCallback(async (id: string) => {
@@ -219,7 +207,6 @@ export default function Home() {
     }
   }, [])
 
-  // Temp node dismissed without saving — just remove from local state, nothing in DB to clean up
   const onDiscard = useCallback((id: string) => {
     discardedRef.current.add(id)
     const meta = tempMetaRef.current.get(id)
@@ -233,7 +220,6 @@ export default function Home() {
     suppressNextCreateRef.current = true
     setTimeout(() => { suppressNextCreateRef.current = false }, 300)
 
-    // Only call DELETE if this was a real node that somehow ended up in discard path
     if (!id.startsWith('temp_')) {
       fetch(`/api/nodes/${id}`, { method: 'DELETE' })
     }
@@ -269,6 +255,7 @@ export default function Home() {
           onDelete={onDelete}
           onDiscard={onDiscard}
           onClose={() => setSelectedNode(null)}
+          onNodeCreateFromEdge={onNodeCreateFromEdge}
         />
       )}
     </div>

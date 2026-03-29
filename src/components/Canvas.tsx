@@ -173,9 +173,23 @@ export default function Canvas({
       .select<SVGTextElement>('text')
       .attr('x', 12)
       .attr('y', 4)
-      .attr('font-size', '13px')
+      .attr('font-size', (d) => {
+        const t = d.text ?? ''
+        if (t.startsWith('# ')) return '45px'
+        if (t.startsWith('## ')) return '30px'
+        return '13px'
+      })
+      .attr('font-weight', (d) => {
+        const t = d.text ?? ''
+        if (t.startsWith('# ')) return '700'
+        if (t.startsWith('## ')) return '600'
+        return '400'
+      })
+      .text((d) => {
+        const t = d.text ?? ''
+        return t.replace(/^#{1,3} /, '')  // strip the ## from display
+      })
       .attr('fill', TEXT_COLOR)
-      .text((d) => d.text ?? '')
 
     nodeSel.exit().remove()
 
