@@ -1,7 +1,7 @@
 # BUILT.md
 
 ## Current State
-Stage 2 complete. Full persistence layer with Drizzle + Neon. Nodes are only written to DB when the user saves content — never on bare click. State survives refresh via localStorage canvas ID.
+Stage 2 complete + post-stage polish. Full persistence layer with Drizzle + Neon. Nodes are only written to DB when the user saves content — never on bare click. State survives refresh via localStorage canvas ID. Canvas settings persisted to localStorage.
 
 ## Steps Completed
 
@@ -34,24 +34,60 @@ Drizzle ORM + Neon Postgres. All mutations backed by API routes. Write-on-save p
 - `POST /api/edges` — create edge, validates no self-loops
 - `DELETE /api/edges/[id]` — delete edge
 
-**Key fixes during Stage 2:**
-- `neon-http` driver doesn't support transactions — removed `db.transaction()`, inserts run sequentially
-- `console.error` added to `/api/nodes` POST for visibility
+---
+
+### Post-Stage 2 Polish (2026-03-28)
+
+**Bug fixes:**
+- Ghost node bug: `onSave` was firing on blur even after discard, writing empty nodes to DB. Fixed with `discardedRef` — a Set that marks node IDs as discarded before any save can fire
+- Popover re-opening bug: `setSelectedNode(saved)` after temp node save was re-opening the popover. Changed to `setSelectedNode(null)`
+- Double node creation on blur: clicking away fired both `onSave` (blur) and `onNodeCreate` (canvas click). Fixed by setting `suppressNextCreateRef.current = true` at the top of `onSave`
+- Ghost node filter in API: nearest-node query now excludes nodes with no text and no url to prevent ghost nodes from poisoning future edge connections
+- Ghost edge on multi-select drag end: canvas click after drag was creating a node. Fixed by checking `selectedNodeIds.size > 0` in click handler and returning early
+- Duplicate `page.tsx` content caused by paste error — cleaned up
+
+**Keyboard shortcuts:**
+- `Tab` on empty node — moves node right by `tabIndentX`
+- `Shift+Tab` on empty node — moves node left by `tabIndentX`
+- `Tab` on filled node — saves current node, creates child node at `(x + tabIndentX, y + tabIndentY)` with explicit edge
+- `Shift+Enter` while editing — saves current node, creates new node directly below at `(x, y + shiftEnterIndentY)` with explicit edge
+- Tab/Shift+Enter are no-ops if node has no text and no movement applies
+- Both await `onSave` to resolve before calling `onNodeCreateFromEdge` so the real node ID is used as edge source
+- `onSave` now returns `Promise<string>` (the real node ID after DB write)
+- `Delete`/`Backspace` — deletes all selected nodes when selection is active and no textarea is focused
+
+**Markdown-style hierarchy on canvas:**
+- Node labels styled by `#` prefix: `# ` = H1, `## ` = H2, `### ` = H3
+- Font size, weight vary by heading level
+- `#` prefix stripped from display label
+- Text wrapping via `wrapText()` helper using `<tspan>` elements — wrap length configurable via settings
+- Question nodes: if `node.text` ends with `?`, node dot and label render in `questionColor`
+
+**Multi-select:**
+- Click a node = select it (shows ring), Shift+click = add/remove from selection
+- Dragging a selected node when multiple are selected moves all together, PATCHes all on drag end
+- Click empty space clears selection
+- `selectedNodeIds: Set<string>` state in `page.tsx`, passed to Canvas as prop
+- Selection ring rendered as `circle.select-ring` in D3, opacity toggled by selection state
+- Small hint bar at bottom of screen: "N nodes selected · Press Delete to remove"
+
+**Canvas Settings panel:**
+- Gear icon (top-right) opens settings panel
+- Settings persisted to `localStorage` under key `jewel_settings`
+- Configurable: H1/H2/H3/default font sizes, node color, edge color, question color, wrap length, Tab indent X/Y, Shift+Enter indent Y
+- Each setting has a slider + typeable number input (sliders and inputs stay in sync)
+- Color settings have a color picker + typeable hex input
+- No horizontal scroll; fixed 300px width
+- Reset to defaults button
+- Spinner arrows hidden on number inputs via `globals.css`
 
 **Files created/changed:**
-- `src/types/index.ts` — added Canvas interface
-- `src/lib/retry.ts` — withRetry() exponential backoff + jitter
-- `src/lib/db.ts` — Drizzle singleton via neon-http
-- `src/schema/index.ts` — canvases (userId nullable), nodes, edges
-- `drizzle.config.ts` — points to src/schema, out drizzle/migrations
-- `drizzle/migrations/` — generated + applied to Neon
-- `src/app/api/canvases/route.ts`
-- `src/app/api/canvases/[id]/route.ts`
-- `src/app/api/nodes/route.ts`
-- `src/app/api/nodes/[id]/route.ts`
-- `src/app/api/edges/route.ts`
-- `src/app/api/edges/[id]/route.ts`
-- `src/app/page.tsx` — full rewrite with write-on-save pattern, tempMetaRef, nodesRef
+- `src/app/page.tsx` — discardedRef, suppressNextCreate on save, onSave returns Promise<string>, settings wired in, SettingsPanel rendered, selectedNodeIds state, onNodeMoveMulti, onNodeMultiSelect, onClearSelection, group delete useEffect, selection hint bar
+- `src/components/Canvas.tsx` — wrapText helper, tspan-based text rendering, hierarchy font sizes/weights, question color, all colors/sizes driven by settings prop, settingsRef for drag callbacks, selectedNodeIds prop, select-ring circle, multi-node drag logic, multiDragRef, selectedNodeIdsRef
+- `src/components/NodePopover.tsx` — async handleKeyDown, Tab/Shift+Tab node move, Tab/Shift+Enter child node creation, onSave typed as Promise<string>, onNodeMove prop, settings prop for indent values
+- `src/components/SettingsPanel.tsx` — new file, gear icon + panel UI, SliderInput + ColorRow sub-components
+- `src/lib/settings.ts` — new file, CanvasSettings interface, DEFAULT_SETTINGS, useSettings hook with localStorage persistence
+- `src/app/globals.css` — spinner arrows hidden, @plugin typography added
 
 ## Current File Tree
 ```
@@ -74,10 +110,12 @@ src/
   components/
     Canvas.tsx
     NodePopover.tsx
+    SettingsPanel.tsx
   lib/
     db.ts
     nearest.ts
     retry.ts
+    settings.ts
   schema/
     index.ts
   types/

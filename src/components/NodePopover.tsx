@@ -13,6 +13,8 @@ interface NodePopoverProps {
   onDiscard: (id: string) => void
   onClose: () => void
   onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
+  onNodeMove: (id: string, x: number, y: number) => void
+
 }
 
 export default function NodePopover({
@@ -24,6 +26,7 @@ export default function NodePopover({
   onDiscard,
   onClose,
   onNodeCreateFromEdge,
+  onNodeMove,
 }: NodePopoverProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -57,10 +60,18 @@ export default function NodePopover({
       if (node.text === null) onDelete(node.id)
       onClose()
     }
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault()
+      onNodeMove(node.id, node.x - settings.tabIndentX, node.y)
+      return
+    }
     if (e.key === 'Tab') {
       e.preventDefault()
       const text = textareaRef.current?.value ?? ''
-      if (!text.trim()) return
+      if (!text.trim()) {
+        onNodeMove(node.id, node.x + settings.tabIndentX, node.y)
+        return
+      }
       const savedId = await onSave(node.id, text)
       onNodeCreateFromEdge(savedId, node.x + settings.tabIndentX, node.y + settings.tabIndentY)
       return

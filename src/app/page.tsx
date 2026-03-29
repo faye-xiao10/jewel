@@ -42,6 +42,7 @@ export default function Home() {
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set())
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 })
   const [loading, setLoading] = useState(true)
   const canvasIdRef = useRef<string | null>(null)
@@ -75,6 +76,7 @@ export default function Home() {
     }
     init()
   }, [])
+  
 
   const onNodeCreate = useCallback((x: number, y: number) => {
     if (suppressNextCreateRef.current) {
@@ -101,6 +103,7 @@ export default function Home() {
       return [...prev, tempNode]
     })
     setSelectedNode(tempNode)
+    setSelectedNodeIds(new Set())
   }, [])
 
   const onNodeCreateFromEdge = useCallback((sourceId: string, x: number, y: number) => {
@@ -117,6 +120,7 @@ export default function Home() {
     setNodes((prev) => [...prev, tempNode])
     setEdges((prev) => [...prev, tempEdge])
     setSelectedNode(tempNode)
+    setSelectedNodeIds(new Set())
   }, [])
 
   const onNodeMove = useCallback(async (id: string, x: number, y: number) => {
@@ -131,8 +135,47 @@ export default function Home() {
     })
   }, [])
 
+  const onNodeMoveMulti = useCallback(async (deltas: { id: string; x: number; y: number }[]) => {
+    setNodes((prev) => {
+      const map = new Map(deltas.map((d) => [d.id, d]))
+      return prev.map((n) => {
+        const delta = map.get(n.id)
+        return delta ? { ...n, x: delta.x, y: delta.y, updatedAt: new Date().toISOString() } : n
+      })
+    })
+    await Promise.all(
+      deltas
+        .filter((d) => !d.id.startsWith('temp_'))
+        .map((d) =>
+          fetch(`/api/nodes/${d.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ x: d.x, y: d.y }),
+          })
+        )
+    )
+  }, [])
+
   const onNodeSelect = useCallback((node: Node) => {
     setSelectedNode(node)
+  }, [])
+
+  const onNodeMultiSelect = useCallback((id: string, addToSelection: boolean) => {
+    setSelectedNodeIds((prev) => {
+      const next = new Set(prev)
+      if (addToSelection) {
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+      } else {
+        next.clear()
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const onClearSelection = useCallback(() => {
+    setSelectedNodeIds(new Set())
   }, [])
 
   const onSave = useCallback(async (id: string, text: string): Promise<string> => {
@@ -166,9 +209,7 @@ export default function Home() {
 
         setNodes((prev) => prev.map((n) => (n.id === id ? saved : n)))
         setEdges((prev) => {
-          const without = meta.tempEdgeId
-            ? prev.filter((e) => e.id !== meta.tempEdgeId)
-            : prev
+          const without = meta.tempEdgeId ? prev.filter((e) => e.id !== meta.tempEdgeId) : prev
           return savedEdge ? [...without, savedEdge] : without
         })
 
@@ -197,6 +238,7 @@ export default function Home() {
     setNodes((prev) => { snapshot.nodes = prev; return prev.filter((n) => n.id !== id) })
     setEdges((prev) => { snapshot.edges = prev; return prev.filter((e) => e.fromId !== id && e.toId !== id) })
     setSelectedNode(null)
+    setSelectedNodeIds((prev) => { const next = new Set(prev); next.delete(id); return next })
     tempMetaRef.current.delete(id)
 
     if (!id.startsWith('temp_')) {
@@ -209,6 +251,19 @@ export default function Home() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (selectedNodeIds.size === 0) return
+      if (document.activeElement?.tagName === 'TEXTAREA') return
+      e.preventDefault()
+      selectedNodeIds.forEach((id) => onDelete(id))
+      setSelectedNodeIds(new Set())
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedNodeIds, onDelete])
 
   const onDiscard = useCallback((id: string) => {
     discardedRef.current.add(id)
@@ -245,10 +300,14 @@ export default function Home() {
         nodes={nodes}
         edges={edges}
         settings={settings}
+        selectedNodeIds={selectedNodeIds}
         onNodeCreate={onNodeCreate}
         onNodeCreateFromEdge={onNodeCreateFromEdge}
         onNodeMove={onNodeMove}
+        onNodeMoveMulti={onNodeMoveMulti}
         onNodeSelect={onNodeSelect}
+        onNodeMultiSelect={onNodeMultiSelect}
+        onClearSelection={onClearSelection}
         onTransformChange={setTransform}
       />
       {selectedNodeCurrent && (
@@ -261,7 +320,17 @@ export default function Home() {
           onClose={() => setSelectedNode(null)}
           onNodeCreateFromEdge={onNodeCreateFromEdge}
           settings={settings}
+          onNodeMove={onNodeMove}
+
         />
+      )}
+      {selectedNodeIds.size > 0 && (
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-lg text-xs text-slate-400"
+          style={{ background: '#1e293b', border: '1px solid #334155' }}
+        >
+          {selectedNodeIds.size} node{selectedNodeIds.size > 1 ? 's' : ''} selected · Press Delete to remove
+        </div>
       )}
       <SettingsPanel
         settings={settings}

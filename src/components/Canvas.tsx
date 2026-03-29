@@ -9,10 +9,14 @@ interface CanvasProps {
   nodes: Node[]
   edges: Edge[]
   settings: CanvasSettings
+  selectedNodeIds: Set<string>
   onNodeCreate: (x: number, y: number) => void
   onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
   onNodeMove: (id: string, x: number, y: number) => void
+  onNodeMoveMulti: (deltas: { id: string; x: number; y: number }[]) => void
   onNodeSelect: (node: Node) => void
+  onNodeMultiSelect: (id: string, addToSelection: boolean) => void
+  onClearSelection: () => void
   onTransformChange: (t: { x: number; y: number; k: number }) => void
 }
 
@@ -41,10 +45,14 @@ export default function Canvas({
   nodes,
   edges,
   settings,
+  selectedNodeIds,
   onNodeCreate,
   onNodeCreateFromEdge,
   onNodeMove,
+  onNodeMoveMulti,
   onNodeSelect,
+  onNodeMultiSelect,
+  onClearSelection,
   onTransformChange,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -53,6 +61,8 @@ export default function Canvas({
   nodesRef.current = nodes
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  const selectedNodeIdsRef = useRef(selectedNodeIds)
+  selectedNodeIdsRef.current = selectedNodeIds
 
   const edgeDrawRef = useRef<{
     active: boolean
@@ -64,6 +74,8 @@ export default function Canvas({
     timer: ReturnType<typeof setTimeout> | null
   }>({ active: false, sourceId: '', sourceX: 0, sourceY: 0, startX: 0, startY: 0, timer: null })
 
+  const multiDragRef = useRef<Map<string, { startX: number; startY: number }>>(new Map())
+
   const cancelEdgeDraw = useCallback(() => {
     const svg = d3.select(svgRef.current)
     svg.select('.rubber-band').remove()
@@ -72,7 +84,6 @@ export default function Canvas({
     edgeDrawRef.current.sourceId = ''
   }, [])
 
-  // Setup SVG, zoom, defs once
   useEffect(() => {
     const svgEl = svgRef.current
     if (!svgEl) return
@@ -112,22 +123,24 @@ export default function Canvas({
     svg.on('click', (event: MouseEvent) => {
       if ((event.target as Element).closest('.nodes')) return
       if (edgeDrawRef.current.active) return
+      if (selectedNodeIdsRef.current.size > 0) {
+        onClearSelection()
+        return 
+      }
       const t = transformRef.current
       const [mx, my] = d3.pointer(event, svgEl)
       const x = (mx - t.x) / t.k
       const y = (my - t.y) / t.k
       onNodeCreate(x, y)
     })
-  }, [onNodeCreate, onTransformChange])
+  }, [onNodeCreate, onTransformChange, onClearSelection])
 
-  // Data joins: edges + nodes
   useEffect(() => {
     const svgEl = svgRef.current
     if (!svgEl) return
     const svg = d3.select(svgEl)
     const s = settings
 
-    // --- Edges ---
     const edgeGroup = svg.select<SVGGElement>('g.edges')
     const edgeSel = edgeGroup
       .selectAll<SVGLineElement, Edge>('line.edge')
@@ -145,22 +158,16 @@ export default function Canvas({
       (exit) => exit.remove()
     )
 
-    edgeGroup.selectAll<SVGLineElement, Edge>('line.edge')
-      .attr('stroke', s.edgeColor)
+    edgeGroup.selectAll<SVGLineElement, Edge>('line.edge').attr('stroke', s.edgeColor)
 
     const nodeMap = new Map(nodesRef.current.map((n) => [n.id, n]))
     edgeGroup.selectAll<SVGLineElement, Edge>('line.edge').each(function (d) {
       const from = nodeMap.get(d.fromId)
       const to = nodeMap.get(d.toId)
       if (!from || !to) return
-      d3.select(this)
-        .attr('x1', from.x)
-        .attr('y1', from.y)
-        .attr('x2', to.x)
-        .attr('y2', to.y)
+      d3.select(this).attr('x1', from.x).attr('y1', from.y).attr('x2', to.x).attr('y2', to.y)
     })
 
-    // --- Nodes ---
     const nodeGroup = svg.select<SVGGElement>('g.nodes')
     const nodeSel = nodeGroup
       .selectAll<SVGGElement, Node>('g.node')
@@ -173,17 +180,21 @@ export default function Canvas({
       .attr('transform', (d) => `translate(${d.x},${d.y})`)
       .style('cursor', 'pointer')
 
-    enterSel.append('circle').attr('r', NODE_R)
+    enterSel.append('circle').attr('class', 'node-circle').attr('r', NODE_R)
+    enterSel.append('circle').attr('class', 'select-ring').attr('r', NODE_R + 5).attr('fill', 'none').attr('stroke-width', 2)
     enterSel.append('text')
 
     const allNodes = nodeSel.merge(enterSel)
     allNodes.attr('transform', (d) => `translate(${d.x},${d.y})`)
 
-    allNodes
-      .select('circle')
+    allNodes.select('circle.node-circle')
       .attr('fill', 'white')
       .attr('stroke', (d) => (d.text?.endsWith('?') ? s.questionColor : s.nodeColor))
       .attr('stroke-width', 2)
+
+    allNodes.select('circle.select-ring')
+      .attr('stroke', s.nodeColor)
+      .attr('stroke-opacity', (d) => (selectedNodeIds.has(d.id) ? 0.8 : 0))
 
     allNodes.each(function(d) {
       const t = d.text ?? ''
@@ -218,7 +229,6 @@ export default function Canvas({
 
     nodeSel.exit().remove()
 
-    // Drag behavior
     const drag = d3
       .drag<SVGGElement, Node>()
       .on('start', function (event, d) {
@@ -227,15 +237,23 @@ export default function Canvas({
         ed.startX = event.x
         ed.startY = event.y
 
+        const sel = selectedNodeIdsRef.current
+        if (sel.has(d.id) && sel.size > 1) {
+          multiDragRef.current.clear()
+          nodesRef.current.forEach((n) => {
+            if (sel.has(n.id)) multiDragRef.current.set(n.id, { startX: n.x, startY: n.y })
+          })
+        }
+
         ed.timer = setTimeout(() => {
+          if (selectedNodeIdsRef.current.size > 1 && selectedNodeIdsRef.current.has(d.id)) return
           ed.active = true
           ed.sourceId = d.id
           ed.sourceX = d.x
           ed.sourceY = d.y
 
           d3.select(svgEl)
-            .select('g.zoom-layer')
-            .select('g.nodes')
+            .select('g.zoom-layer g.nodes')
             .selectAll<SVGGElement, Node>('g.node')
             .filter((n) => n.id === d.id)
             .append('circle')
@@ -253,10 +271,7 @@ export default function Canvas({
         if (ed.timer) {
           const dx = event.x - ed.startX
           const dy = event.y - ed.startY
-          if (Math.hypot(dx, dy) > 4) {
-            clearTimeout(ed.timer)
-            ed.timer = null
-          }
+          if (Math.hypot(dx, dy) > 4) { clearTimeout(ed.timer); ed.timer = null }
         }
 
         if (ed.active) {
@@ -265,11 +280,9 @@ export default function Canvas({
           const sy = ed.sourceY * t.k + t.y
           const svg2 = d3.select(svgEl)
           svg2.select('.rubber-band').remove()
-          svg2
-            .append('line')
+          svg2.append('line')
             .attr('class', 'rubber-band')
-            .attr('x1', sx)
-            .attr('y1', sy)
+            .attr('x1', sx).attr('y1', sy)
             .attr('x2', event.sourceEvent.offsetX)
             .attr('y2', event.sourceEvent.offsetY)
             .attr('stroke', settingsRef.current.edgeColor)
@@ -279,24 +292,38 @@ export default function Canvas({
           return
         }
 
-        const t = transformRef.current
+        const sel = selectedNodeIdsRef.current
+        if (sel.has(d.id) && sel.size > 1) {
+          const dx = event.x - ed.startX
+          const dy = event.y - ed.startY
+          const edgeGroupEl = d3.select(svgEl).select('g.edges')
+          nodeGroup.selectAll<SVGGElement, Node>('g.node').each(function(n) {
+            if (!sel.has(n.id)) return
+            const start = multiDragRef.current.get(n.id)
+            if (!start) return
+            n.x = start.startX + dx
+            n.y = start.startY + dy
+            d3.select(this).attr('transform', `translate(${n.x},${n.y})`)
+            edgeGroupEl.selectAll<SVGLineElement, Edge>('line.edge').each(function(ed2) {
+              if (ed2.fromId === n.id) d3.select(this).attr('x1', n.x).attr('y1', n.y)
+              if (ed2.toId === n.id) d3.select(this).attr('x2', n.x).attr('y2', n.y)
+            })
+          })
+          return
+        }
+
         d.x = event.x
         d.y = event.y
         d3.select(this).attr('transform', `translate(${d.x},${d.y})`)
-
         const edgeGroupEl = d3.select(svgEl).select('g.edges')
         edgeGroupEl.selectAll<SVGLineElement, Edge>('line.edge').each(function (ed2) {
           if (ed2.fromId === d.id) d3.select(this).attr('x1', d.x).attr('y1', d.y)
           if (ed2.toId === d.id) d3.select(this).attr('x2', d.x).attr('y2', d.y)
         })
-        void t
       })
       .on('end', function (event, d) {
         const ed = edgeDrawRef.current
-        if (ed.timer) {
-          clearTimeout(ed.timer)
-          ed.timer = null
-        }
+        if (ed.timer) { clearTimeout(ed.timer); ed.timer = null }
 
         if (ed.active) {
           d3.select(svgEl).select('.rubber-band').remove()
@@ -305,10 +332,7 @@ export default function Canvas({
 
           const dx = event.sourceEvent.offsetX - (ed.sourceX * transformRef.current.k + transformRef.current.x)
           const dy = event.sourceEvent.offsetY - (ed.sourceY * transformRef.current.k + transformRef.current.y)
-          if (Math.hypot(dx, dy) < CANCEL_RADIUS) {
-            onNodeSelect(d)
-            return
-          }
+          if (Math.hypot(dx, dy) < CANCEL_RADIUS) { onNodeSelect(d); return }
 
           const t = transformRef.current
           const x = (event.sourceEvent.offsetX - t.x) / t.k
@@ -321,7 +345,19 @@ export default function Canvas({
         const dx2 = event.x - ed.startX
         const dy2 = event.y - ed.startY
         if (Math.hypot(dx2, dy2) < 4) {
-          onNodeSelect(d)
+          const addToSelection = (event.sourceEvent as MouseEvent).shiftKey
+          onNodeMultiSelect(d.id, addToSelection)
+          if (!addToSelection) onNodeSelect(d)
+          return
+        }
+
+        const sel = selectedNodeIdsRef.current
+        if (sel.has(d.id) && sel.size > 1) {
+          const deltas = nodesRef.current
+            .filter((n) => sel.has(n.id))
+            .map((n) => ({ id: n.id, x: n.x, y: n.y }))
+          onNodeMoveMulti(deltas)
+          multiDragRef.current.clear()
           return
         }
 
@@ -329,7 +365,7 @@ export default function Canvas({
       })
 
     nodeGroup.selectAll<SVGGElement, Node>('g.node').call(drag)
-  }, [nodes, edges, settings, onNodeMove, onNodeSelect, onNodeCreateFromEdge, cancelEdgeDraw])
+  }, [nodes, edges, settings, selectedNodeIds, onNodeMove, onNodeMoveMulti, onNodeSelect, onNodeMultiSelect, onNodeCreateFromEdge, cancelEdgeDraw])
 
   return (
     <svg
