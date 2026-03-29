@@ -175,14 +175,17 @@ export default function Canvas({
       .attr('y', 4)
       .attr('font-size', (d) => {
         const t = d.text ?? ''
-        if (t.startsWith('# ')) return '45px'
-        if (t.startsWith('## ')) return '30px'
+        if (t.startsWith('# ')) return '60px'
+        if (t.startsWith('## ')) return '45px'
+        if (t.startsWith('### ')) return '30px'
+
         return '13px'
       })
       .attr('font-weight', (d) => {
         const t = d.text ?? ''
-        if (t.startsWith('# ')) return '700'
-        if (t.startsWith('## ')) return '600'
+        if (t.startsWith('# ')) return '800'
+        if (t.startsWith('## ')) return '700'
+        if (t.startsWith('### ')) return '600'
         return '400'
       })
       .text((d) => {
