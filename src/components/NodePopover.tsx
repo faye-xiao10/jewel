@@ -138,7 +138,7 @@ export default function NodePopover({
               onDelete(node.id)
               onClose()
             }}
-            className="w-full rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/30 transition-colors"
+            className="w-full rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/30 transition-colors mb-1"
           >
             Delete node
           </button>
