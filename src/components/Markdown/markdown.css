@@ -1,0 +1,107 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@layer components {
+  .markdown {
+       @apply prose lg:prose-xl max-w-none;
+
+       --tw-prose-body: var(--text-body);
+   
+       /* optional but safe */
+       --tw-prose-headings: var(--text-heading);
+       --tw-prose-links: var(--text-body);
+       --tw-prose-bold: inherit;
+       --tw-prose-quotes: inherit;
+       --tw-prose-counters: inherit;
+       --tw-prose-captions: inherit;
+
+
+    /* Links in headings should not look like links */
+    @apply [&_h1>a]:no-underline
+           [&_h2>a]:no-underline
+           [&_h3>a]:no-underline
+           [&_h4>a]:no-underline
+           [&_h5>a]:no-underline
+           [&_h6>a]:no-underline;
+
+    /* Make heading anchors keep heading weight (typography sets a { font-weight: 500 }) */
+    @apply [&_h1>a]:font-extrabold
+           [&_h2>a]:font-bold
+           [&_h3>a]:font-semibold
+           [&_h4>a]:font-semibold
+           [&_h5>a]:font-semibold
+           [&_h6>a]:font-semibold;
+
+    /* Heading hierarchy (size/spacing only) */
+    @apply [&_h1]:text-5xl
+           [&_h1]:font-extrabold
+           [&_h1]:tracking-tight
+           [&_h1]:mt-0
+           [&_h1]:mb-4;
+
+    @apply [&_h2]:text-4xl
+           [&_h2]:font-bold
+           [&_h2]:mt-8
+           [&_h2]:mb-3;
+
+    @apply [&_h3]:text-2xl
+           [&_h3]:font-semibold
+           [&_h3]:mt-6
+           [&_h3]:mb-2;
+
+    /* Images */
+    @apply [&_img]:max-w-full
+           [&_img]:h-auto
+           [&_img[height]]:w-auto;
+
+    /* Tables */
+    @apply [&_table]:w-full
+           [&_table]:border-collapse
+           [&_table]:table-fixed;
+
+    @apply [&_td]:align-middle
+           [&_td]:p-0
+           [&_td]:text-left;
+
+    @apply [&_td:first-child]:pr-6;
+
+    @apply [&_td_img]:align-top
+           [&_td_img]:block
+           [&_td_img]:m-0;
+
+           
+
+    @apply [&_thead]:hidden;
+  }
+
+  /* Catch-all color: ensure containers that hold raw text nodes inherit correctly */
+  .markdown :where(p, li, td, th, blockquote, figcaption, pre, code)
+    :not(:where(.not-prose, .not-prose *)) {
+    color: var(--text-body);
+  }
+
+  /* Heading links: ONLY these should lose underline + inherit heading weight */
+  .markdown :where(h1 a, h2 a, h3 a, h4 a, h5 a, h6 a)
+    :not(:where(.not-prose, .not-prose *)) {
+    color: var(--text-body);
+    text-decoration: none;
+    font-weight: inherit;
+  }
+
+  .markdown :where(strong, b):not(:where(.not-prose, .not-prose *)) {
+       font-weight: 800;
+}
+
+.markdown :where(h1):not(.not-prose) {
+       font-weight: 900;
+}
+     
+.markdown :where(h2):not(.not-prose) {
+       font-weight: 800;
+}
+
+  /* --- DEBUG ONLY (delete when done) ---
+  .markdown { outline: 4px solid red !important; }
+  .markdown p { color: hotpink !important; }
+  */
+}
