@@ -10,6 +10,7 @@ export interface Node {
   canvasId: string
   text: string | null
   url: string | null
+  color?: string | null
   x: number
   y: number
   createdAt: string
@@ -21,5 +22,6 @@ export interface Edge {
   canvasId: string
   fromId: string
   toId: string
+  color?: string | null
   createdAt: string
 }

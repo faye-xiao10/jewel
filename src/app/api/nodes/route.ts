@@ -9,7 +9,7 @@ import type { Node } from '@/types'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { canvasId, x, y, explicitFromId, text } = body
+    const { canvasId, x, y, explicitFromId, text, color, edgeColor } = body
 
     if (!canvasId || x == null || y == null) {
       return NextResponse.json(
@@ -19,14 +19,17 @@ export async function POST(req: Request) {
     }
 
     const result = await withRetry(async () => {
-      const [node] = await db.insert(nodes).values({ canvasId, x, y, text: text ?? null }).returning()
+      const [node] = await db
+        .insert(nodes)
+        .values({ canvasId, x, y, text: text ?? null, color: color ?? null })
+        .returning()
 
       let edge = null
 
       if (explicitFromId) {
         ;[edge] = await db
           .insert(edges)
-          .values({ canvasId, fromId: explicitFromId, toId: node.id })
+          .values({ canvasId, fromId: explicitFromId, toId: node.id, color: edgeColor ?? null })
           .returning()
       } else {
         const existing = await db
@@ -41,6 +44,7 @@ export async function POST(req: Request) {
             canvasId: n.canvasId,
             text: n.text,
             url: n.url,
+            color: n.color ?? undefined,
             x: n.x,
             y: n.y,
             createdAt: n.createdAt.toISOString(),
@@ -51,7 +55,7 @@ export async function POST(req: Request) {
         if (nearest) {
           ;[edge] = await db
             .insert(edges)
-            .values({ canvasId, fromId: nearest.id, toId: node.id })
+            .values({ canvasId, fromId: nearest.id, toId: node.id, color: edgeColor ?? null })
             .returning()
         }
       }

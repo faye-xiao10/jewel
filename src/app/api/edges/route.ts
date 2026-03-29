@@ -6,7 +6,7 @@ import { withRetry } from '@/lib/retry'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { canvasId, fromId, toId } = body
+    const { canvasId, fromId, toId, color } = body
 
     if (!canvasId || !fromId || !toId) {
       return NextResponse.json(
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     }
 
     const [edge] = await withRetry(() =>
-      db.insert(edges).values({ canvasId, fromId, toId }).returning()
+      db.insert(edges).values({ canvasId, fromId, toId, color: color ?? null }).returning()
     )
     return NextResponse.json(edge, { status: 201 })
   } catch (error) {

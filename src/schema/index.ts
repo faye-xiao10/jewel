@@ -16,6 +16,7 @@ export const nodes = pgTable('nodes', {
     .references(() => canvases.id, { onDelete: 'cascade' }),
   text: text('text'),
   url: text('url'),
+  color: text('color'),
   x: real('x').notNull(),
   y: real('y').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -33,5 +34,6 @@ export const edges = pgTable('edges', {
   toId: text('to_id')
     .notNull()
     .references(() => nodes.id, { onDelete: 'cascade' }),
+  color: text('color'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
