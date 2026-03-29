@@ -3,10 +3,12 @@
 import { useEffect, useRef, useCallback } from 'react'
 import * as d3 from 'd3'
 import type { Node, Edge } from '@/types'
+import type { CanvasSettings } from '@/lib/settings'
 
 interface CanvasProps {
   nodes: Node[]
   edges: Edge[]
+  settings: CanvasSettings
   onNodeCreate: (x: number, y: number) => void
   onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
   onNodeMove: (id: string, x: number, y: number) => void
@@ -14,17 +16,31 @@ interface CanvasProps {
   onTransformChange: (t: { x: number; y: number; k: number }) => void
 }
 
-const INDIGO = '#6366f1'
 const BG = '#0f172a'
-const TEXT_COLOR = '#e2e8f0'
 const NODE_R = 6
 const LONG_PRESS_MS = 300
 const CANCEL_RADIUS = 10
-const QUESTION_COLOR = '#f59e0b' 
+
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > maxChars) {
+      if (current) lines.push(current)
+      current = word
+    } else {
+      current = current ? current + ' ' + word : word
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
 
 export default function Canvas({
   nodes,
   edges,
+  settings,
   onNodeCreate,
   onNodeCreateFromEdge,
   onNodeMove,
@@ -35,8 +51,9 @@ export default function Canvas({
   const transformRef = useRef({ x: 0, y: 0, k: 1 })
   const nodesRef = useRef(nodes)
   nodesRef.current = nodes
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
 
-  // Edge-draw state
   const edgeDrawRef = useRef<{
     active: boolean
     sourceId: string
@@ -54,22 +71,6 @@ export default function Canvas({
     edgeDrawRef.current.active = false
     edgeDrawRef.current.sourceId = ''
   }, [])
-  
-  function wrapText(text: string, maxChars: number): string[] {
-    const words = text.split(' ')
-    const lines: string[] = []
-    let current = ''
-    for (const word of words) {
-      if ((current + ' ' + word).trim().length > maxChars) {
-        if (current) lines.push(current)
-        current = word
-      } else {
-        current = current ? current + ' ' + word : word
-      }
-    }
-    if (current) lines.push(current)
-    return lines
-  }
 
   // Setup SVG, zoom, defs once
   useEffect(() => {
@@ -78,7 +79,6 @@ export default function Canvas({
     const svg = d3.select(svgEl)
     svg.selectAll('*').remove()
 
-    // Defs: arrowhead
     const defs = svg.append('defs')
     defs
       .append('marker')
@@ -91,7 +91,7 @@ export default function Canvas({
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-4L8,0L0,4')
-      .attr('fill', INDIGO)
+      .attr('fill', settingsRef.current.edgeColor)
 
     const zoomLayer = svg.append('g').attr('class', 'zoom-layer')
     zoomLayer.append('g').attr('class', 'edges')
@@ -109,7 +109,6 @@ export default function Canvas({
 
     svg.call(zoom)
 
-    // Click empty space → create node
     svg.on('click', (event: MouseEvent) => {
       if ((event.target as Element).closest('.nodes')) return
       if (edgeDrawRef.current.active) return
@@ -126,6 +125,7 @@ export default function Canvas({
     const svgEl = svgRef.current
     if (!svgEl) return
     const svg = d3.select(svgEl)
+    const s = settings
 
     // --- Edges ---
     const edgeGroup = svg.select<SVGGElement>('g.edges')
@@ -138,7 +138,6 @@ export default function Canvas({
         enter
           .append('line')
           .attr('class', 'edge')
-          .attr('stroke', INDIGO)
           .attr('stroke-width', 1.5)
           .attr('stroke-opacity', 0.6)
           .attr('marker-end', 'url(#arrow)'),
@@ -146,7 +145,9 @@ export default function Canvas({
       (exit) => exit.remove()
     )
 
-    // Position all edges
+    edgeGroup.selectAll<SVGLineElement, Edge>('line.edge')
+      .attr('stroke', s.edgeColor)
+
     const nodeMap = new Map(nodesRef.current.map((n) => [n.id, n]))
     edgeGroup.selectAll<SVGLineElement, Edge>('line.edge').each(function (d) {
       const from = nodeMap.get(d.fromId)
@@ -161,7 +162,6 @@ export default function Canvas({
 
     // --- Nodes ---
     const nodeGroup = svg.select<SVGGElement>('g.nodes')
-
     const nodeSel = nodeGroup
       .selectAll<SVGGElement, Node>('g.node')
       .data(nodes, (d) => d.id)
@@ -177,46 +177,46 @@ export default function Canvas({
     enterSel.append('text')
 
     const allNodes = nodeSel.merge(enterSel)
-
     allNodes.attr('transform', (d) => `translate(${d.x},${d.y})`)
 
     allNodes
       .select('circle')
       .attr('fill', 'white')
-      .attr('stroke', (d) => (d.text?.endsWith('?') ? QUESTION_COLOR : INDIGO))
+      .attr('stroke', (d) => (d.text?.endsWith('?') ? s.questionColor : s.nodeColor))
       .attr('stroke-width', 2)
 
-      allNodes.each(function(d) {
-        const t = d.text ?? ''
-        const stripped = t.replace(/^#{1,3} /, '')
-        const isH1 = t.startsWith('# ')
-        const isH2 = t.startsWith('## ')
-        const isH3 = t.startsWith('### ')
-        const isQuestion = t.endsWith('?')
-      
-        const fontSize = isH1 ? 60 : isH2 ? 45 : isH3 ? 30 : 13
-        const fontWeight = isH1 ? '800' : isH2 ? '700' : isH3 ? '600' : '400'
-        const fill = isQuestion ? QUESTION_COLOR : TEXT_COLOR
-        const maxChars = isH1 ? 15 : isH2 ? 20 : isH3 ? 25 : 40
-        const lineHeight = fontSize * 1.2
-      
-        const lines = wrapText(stripped, maxChars)
-        const textEl = d3.select(this).select<SVGTextElement>('text')
-        textEl.selectAll('tspan').remove()
-        textEl
+    allNodes.each(function(d) {
+      const t = d.text ?? ''
+      const stripped = t.replace(/^#{1,3} /, '')
+      const isH1 = t.startsWith('# ')
+      const isH2 = t.startsWith('## ')
+      const isH3 = t.startsWith('### ')
+      const isQuestion = t.endsWith('?')
+
+      const fontSize = isH1 ? s.h1Size : isH2 ? s.h2Size : isH3 ? s.h3Size : s.defaultSize
+      const fontWeight = isH1 ? '800' : isH2 ? '700' : isH3 ? '600' : '400'
+      const fill = isQuestion ? s.questionColor : '#e2e8f0'
+      const lineHeight = fontSize * 1.2
+
+      const lines = wrapText(stripped, s.wrapLength)
+      const textEl = d3.select(this).select<SVGTextElement>('text')
+      textEl.selectAll('tspan').remove()
+      textEl
+        .attr('x', 12)
+        .attr('y', 4)
+        .attr('font-size', `${fontSize}px`)
+        .attr('font-weight', fontWeight)
+        .attr('fill', fill)
+
+      lines.forEach((line, i) => {
+        textEl.append('tspan')
           .attr('x', 12)
-          .attr('y', 4)
-          .attr('font-size', `${fontSize}px`)
-          .attr('font-weight', fontWeight)
-          .attr('fill', fill)
-      
-        lines.forEach((line, i) => {
-          textEl.append('tspan')
-            .attr('x', 12)
-            .attr('dy', i === 0 ? 0 : lineHeight)
-            .text(line)
-        })
+          .attr('dy', i === 0 ? 0 : lineHeight)
+          .text(line)
       })
+    })
+
+    nodeSel.exit().remove()
 
     // Drag behavior
     const drag = d3
@@ -224,7 +224,6 @@ export default function Canvas({
       .on('start', function (event, d) {
         const ed = edgeDrawRef.current
         if (ed.timer) clearTimeout(ed.timer)
-
         ed.startX = event.x
         ed.startY = event.y
 
@@ -234,7 +233,6 @@ export default function Canvas({
           ed.sourceX = d.x
           ed.sourceY = d.y
 
-          // Glow ring
           d3.select(svgEl)
             .select('g.zoom-layer')
             .select('g.nodes')
@@ -244,7 +242,7 @@ export default function Canvas({
             .attr('class', 'glow-ring')
             .attr('r', NODE_R + 6)
             .attr('fill', 'none')
-            .attr('stroke', INDIGO)
+            .attr('stroke', settingsRef.current.nodeColor)
             .attr('stroke-width', 2)
             .attr('stroke-opacity', 0.5)
             .attr('filter', 'blur(2px)')
@@ -262,7 +260,6 @@ export default function Canvas({
         }
 
         if (ed.active) {
-          // Rubber band in screen space — convert source to screen
           const t = transformRef.current
           const sx = ed.sourceX * t.k + t.x
           const sy = ed.sourceY * t.k + t.y
@@ -275,30 +272,23 @@ export default function Canvas({
             .attr('y1', sy)
             .attr('x2', event.sourceEvent.offsetX)
             .attr('y2', event.sourceEvent.offsetY)
-            .attr('stroke', INDIGO)
+            .attr('stroke', settingsRef.current.edgeColor)
             .attr('stroke-width', 1.5)
             .attr('stroke-dasharray', '5,4')
             .attr('pointer-events', 'none')
           return
         }
 
-        // Normal drag
         const t = transformRef.current
         d.x = event.x
         d.y = event.y
         d3.select(this).attr('transform', `translate(${d.x},${d.y})`)
 
-        // Update connected edges live
         const edgeGroupEl = d3.select(svgEl).select('g.edges')
         edgeGroupEl.selectAll<SVGLineElement, Edge>('line.edge').each(function (ed2) {
-          if (ed2.fromId === d.id) {
-            d3.select(this).attr('x1', d.x).attr('y1', d.y)
-          }
-          if (ed2.toId === d.id) {
-            d3.select(this).attr('x2', d.x).attr('y2', d.y)
-          }
+          if (ed2.fromId === d.id) d3.select(this).attr('x1', d.x).attr('y1', d.y)
+          if (ed2.toId === d.id) d3.select(this).attr('x2', d.x).attr('y2', d.y)
         })
-        // silence unused var warning
         void t
       })
       .on('end', function (event, d) {
@@ -316,7 +306,6 @@ export default function Canvas({
           const dx = event.sourceEvent.offsetX - (ed.sourceX * transformRef.current.k + transformRef.current.x)
           const dy = event.sourceEvent.offsetY - (ed.sourceY * transformRef.current.k + transformRef.current.y)
           if (Math.hypot(dx, dy) < CANCEL_RADIUS) {
-            // too close — cancel, treat as click
             onNodeSelect(d)
             return
           }
@@ -329,7 +318,6 @@ export default function Canvas({
           return
         }
 
-        // Check if it was a click (no movement)
         const dx2 = event.x - ed.startX
         const dy2 = event.y - ed.startY
         if (Math.hypot(dx2, dy2) < 4) {
@@ -341,14 +329,14 @@ export default function Canvas({
       })
 
     nodeGroup.selectAll<SVGGElement, Node>('g.node').call(drag)
-  }, [nodes, edges, onNodeMove, onNodeSelect, onNodeCreateFromEdge, cancelEdgeDraw])
+  }, [nodes, edges, settings, onNodeMove, onNodeSelect, onNodeCreateFromEdge, cancelEdgeDraw])
 
   return (
     <svg
       ref={svgRef}
       className="w-full h-screen block"
       style={{ background: BG }}
-      onMouseDown={(e) => e.preventDefault()}  // ← add this
+      onMouseDown={(e) => e.preventDefault()}
     />
   )
 }

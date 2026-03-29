@@ -3,7 +3,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import Canvas from '@/components/Canvas'
 import NodePopover from '@/components/NodePopover'
+import SettingsPanel from '@/components/SettingsPanel'
 import { findNearest } from '@/lib/nearest'
+import { useSettings } from '@/lib/settings'
 import type { Node, Edge } from '@/types'
 
 const CANVAS_ID_KEY = 'jewel_canvas_id'
@@ -48,6 +50,7 @@ export default function Home() {
   nodesRef.current = nodes
   const tempMetaRef = useRef<Map<string, TempMeta>>(new Map())
   const discardedRef = useRef<Set<string>>(new Set())
+  const { settings, updateSetting, resetSettings } = useSettings()
 
   useEffect(() => {
     async function init() {
@@ -86,7 +89,7 @@ export default function Home() {
     const tempNode: Node = { id: tempId, canvasId, text: null, url: null, x, y, createdAt: now, updatedAt: now }
 
     setNodes((prev) => {
-      const nearest = findNearest(prev, x, y)
+      const nearest = findNearest(prev.filter(n => !n.id.startsWith('temp_')), x, y)
       if (nearest) {
         const tempEdgeId = `temp_edge_${Date.now()}`
         tempMetaRef.current.set(tempId, { tempEdgeId })
@@ -241,6 +244,7 @@ export default function Home() {
       <Canvas
         nodes={nodes}
         edges={edges}
+        settings={settings}
         onNodeCreate={onNodeCreate}
         onNodeCreateFromEdge={onNodeCreateFromEdge}
         onNodeMove={onNodeMove}
@@ -256,8 +260,14 @@ export default function Home() {
           onDiscard={onDiscard}
           onClose={() => setSelectedNode(null)}
           onNodeCreateFromEdge={onNodeCreateFromEdge}
+          settings={settings}
         />
       )}
+      <SettingsPanel
+        settings={settings}
+        onUpdate={updateSetting}
+        onReset={resetSettings}
+      />
     </div>
   )
 }
