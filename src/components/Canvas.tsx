@@ -20,6 +20,7 @@ const TEXT_COLOR = '#e2e8f0'
 const NODE_R = 6
 const LONG_PRESS_MS = 300
 const CANCEL_RADIUS = 10
+const QUESTION_COLOR = '#f59e0b' 
 
 export default function Canvas({
   nodes,
@@ -53,6 +54,22 @@ export default function Canvas({
     edgeDrawRef.current.active = false
     edgeDrawRef.current.sourceId = ''
   }, [])
+  
+  function wrapText(text: string, maxChars: number): string[] {
+    const words = text.split(' ')
+    const lines: string[] = []
+    let current = ''
+    for (const word of words) {
+      if ((current + ' ' + word).trim().length > maxChars) {
+        if (current) lines.push(current)
+        current = word
+      } else {
+        current = current ? current + ' ' + word : word
+      }
+    }
+    if (current) lines.push(current)
+    return lines
+  }
 
   // Setup SVG, zoom, defs once
   useEffect(() => {
@@ -166,35 +183,40 @@ export default function Canvas({
     allNodes
       .select('circle')
       .attr('fill', 'white')
-      .attr('stroke', INDIGO)
+      .attr('stroke', (d) => (d.text?.endsWith('?') ? QUESTION_COLOR : INDIGO))
       .attr('stroke-width', 2)
 
-    allNodes
-      .select<SVGTextElement>('text')
-      .attr('x', 12)
-      .attr('y', 4)
-      .attr('font-size', (d) => {
+      allNodes.each(function(d) {
         const t = d.text ?? ''
-        if (t.startsWith('# ')) return '60px'
-        if (t.startsWith('## ')) return '45px'
-        if (t.startsWith('### ')) return '30px'
-
-        return '13px'
+        const stripped = t.replace(/^#{1,3} /, '')
+        const isH1 = t.startsWith('# ')
+        const isH2 = t.startsWith('## ')
+        const isH3 = t.startsWith('### ')
+        const isQuestion = t.endsWith('?')
+      
+        const fontSize = isH1 ? 60 : isH2 ? 45 : isH3 ? 30 : 13
+        const fontWeight = isH1 ? '800' : isH2 ? '700' : isH3 ? '600' : '400'
+        const fill = isQuestion ? QUESTION_COLOR : TEXT_COLOR
+        const maxChars = isH1 ? 15 : isH2 ? 20 : isH3 ? 25 : 40
+        const lineHeight = fontSize * 1.2
+      
+        const lines = wrapText(stripped, maxChars)
+        const textEl = d3.select(this).select<SVGTextElement>('text')
+        textEl.selectAll('tspan').remove()
+        textEl
+          .attr('x', 12)
+          .attr('y', 4)
+          .attr('font-size', `${fontSize}px`)
+          .attr('font-weight', fontWeight)
+          .attr('fill', fill)
+      
+        lines.forEach((line, i) => {
+          textEl.append('tspan')
+            .attr('x', 12)
+            .attr('dy', i === 0 ? 0 : lineHeight)
+            .text(line)
+        })
       })
-      .attr('font-weight', (d) => {
-        const t = d.text ?? ''
-        if (t.startsWith('# ')) return '800'
-        if (t.startsWith('## ')) return '700'
-        if (t.startsWith('### ')) return '600'
-        return '400'
-      })
-      .text((d) => {
-        const t = d.text ?? ''
-        return t.replace(/^#{1,3} /, '')  // strip the ## from display
-      })
-      .attr('fill', TEXT_COLOR)
-
-    nodeSel.exit().remove()
 
     // Drag behavior
     const drag = d3
