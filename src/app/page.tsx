@@ -282,6 +282,16 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedNodeIds, onDelete])
 
+  const onSessionColorChange = useCallback((date: string, color: string) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    if (date === today) {
+      localStorage.setItem('jewel_session_color', JSON.stringify({ date: today, color }));
+      sessionColorRef.current = color;
+    }
+    setNodes(prev => prev.map(n => n.createdAt.startsWith(date) ? { ...n, color } : n))
+    setEdges(prev => prev.map(e => e.createdAt.startsWith(date) ? { ...e, color } : e))
+  }, [])
+
   const onDiscard = useCallback((id: string) => {
     discardedRef.current.add(id)
     const meta = tempMetaRef.current.get(id)
@@ -356,6 +366,8 @@ export default function Home() {
         settings={settings}
         onUpdate={updateSetting}
         onReset={resetSettings}
+        canvasId={canvasIdRef.current ?? ''}
+        onSessionColorChange={onSessionColorChange}
       />
     </div>
   )

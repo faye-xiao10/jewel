@@ -1,16 +1,59 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { CanvasSettings } from '@/lib/settings'
+import { SessionColorRow, PastSessionsDropdown } from '@/components/PastSessionsDropdown'
+
+interface SessionInfo {
+  date: string
+  color: string
+}
 
 interface SettingsPanelProps {
   settings: CanvasSettings
   onUpdate: <K extends keyof CanvasSettings>(key: K, value: CanvasSettings[K]) => void
   onReset: () => void
+  canvasId: string
+  onSessionColorChange: (date: string, color: string) => void
 }
 
-export default function SettingsPanel({ settings, onUpdate, onReset }: SettingsPanelProps) {
+export default function SettingsPanel({ settings, onUpdate, onReset, canvasId, onSessionColorChange }: SettingsPanelProps) {
   const [open, setOpen] = useState(false)
+  const [sessions, setSessions] = useState<SessionInfo[]>([])
+
+  const todayStr = new Date().toLocaleDateString('en-CA')
+  const todaySession = sessions.find(s => s.date === todayStr) ?? null
+  const pastSessions = sessions.filter(s => s.date !== todayStr)
+
+  useEffect(() => {
+    fetch(`/api/canvases/${canvasId}/session-colors`)
+      .then(r => r.json())
+      .then(d => setSessions(d.sessions ?? []))
+      .catch(() => {})
+  }, [canvasId])
+
+  async function handleSessionColorChange(date: string, color: string) {
+    setSessions(prev => prev.map(s => s.date === date ? { ...s, color } : s))
+    try {
+      const res = await fetch(`/api/canvases/${canvasId}/session-colors`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, color }),
+      })
+      if (res.ok) onSessionColorChange(date, color)
+    } catch {}
+  }
+
+  function formatDate(date: string): string {
+    const now = new Date()
+    const today = now.toLocaleDateString('en-CA')
+    const yd = new Date(now)
+    yd.setDate(yd.getDate() - 1)
+    const yesterday = yd.toLocaleDateString('en-CA')
+    if (date === today) return 'Today'
+    if (date === yesterday) return 'Yesterday'
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
 
   return (
     <>
@@ -47,10 +90,25 @@ export default function SettingsPanel({ settings, onUpdate, onReset }: SettingsP
             </Section>
 
             <Section label="Colors">
-              <ColorRow label="Node" value={settings.nodeColor} onChange={(v) => onUpdate('nodeColor', v)} />
-              <ColorRow label="Edge" value={settings.edgeColor} onChange={(v) => onUpdate('edgeColor', v)} />
-              <ColorRow label="Question (?)" value={settings.questionColor} onChange={(v) => onUpdate('questionColor', v)} />
-            </Section>
+                <ColorRow label="Question (?)" value={settings.questionColor} onChange={(v) => onUpdate('questionColor', v)} />
+                {todaySession && (
+                    <SessionColorRow
+                    label="Today"
+                    value={todaySession.color}
+                    onConfirm={v => handleSessionColorChange(todaySession.date, v)}
+                    />
+                )}
+                {pastSessions.length > 0 && (
+                    <PastSessionsDropdown
+                    sessions={pastSessions}
+                    formatDate={formatDate}
+                    onConfirm={handleSessionColorChange}
+                    />
+                )}
+                {sessions.length === 0 && (
+                    <p className="text-xs text-slate-500">No sessions yet</p>
+                )}
+                </Section>
 
             <Section label="Text Wrapping">
               <SliderInput label="Wrap at (chars)" value={settings.wrapLength} min={10} max={100} onChange={(v) => onUpdate('wrapLength', v)} />
@@ -61,6 +119,8 @@ export default function SettingsPanel({ settings, onUpdate, onReset }: SettingsP
               <SliderInput label="Tab Y" value={settings.tabIndentY} min={0} max={200} onChange={(v) => onUpdate('tabIndentY', v)} />
               <SliderInput label="Shift+Enter Y" value={settings.shiftEnterIndentY} min={20} max={200} onChange={(v) => onUpdate('shiftEnterIndentY', v)} />
             </Section>
+
+            
 
             <button
               onClick={onReset}

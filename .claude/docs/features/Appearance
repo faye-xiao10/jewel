@@ -44,9 +44,24 @@
 - Style: `font-size: 9px`, `fill: #666`, `opacity: 0.6`, centered
 - `mouseleave` removes the element
 
+### Session Color Editor (2026-03-30)
+- New API: `GET /api/canvases/[id]/session-colors` — queries nodes grouped by local date using `DISTINCT ON (created_at::date)`, returns `{ sessions: [{ date, color }] }` sorted newest first, wrapped in `withRetry`
+- New API: `PATCH /api/canvases/[id]/session-colors` — accepts `{ date: string, color: string }`, updates `nodes.color` + `edges.color` for nodes created in that UTC day range, returns `{ updated: number }`
+- Settings panel Colors section: Node and Edge global color rows removed; session colors merged in — Question (?) color, then Today's `SessionColorRow`, then "Past sessions" dropdown (only shown if past sessions exist)
+- `SessionColorRow`: color picker + hex input + confirm checkmark (enabled only when dirty) — confirm fires PATCH then calls `onSessionColorChange` callback to repaint canvas without reload
+- `PastSessionsDropdown`: pill trigger with rotating chevron; opens `position: fixed` floating list anchored via `getBoundingClientRect()`; closes on outside click via document listener; max-height 240px scrollable
+- `onSessionColorChange` in `page.tsx`: updates `sessionColorRef.current` when date is today (so new nodes immediately use the new color), then remaps nodes/edges using `new Date(n.createdAt).toLocaleDateString('en-CA') === date` for local-timezone correctness
+
+### Local Timezone Fix (2026-03-30)
+- All session date keys were using `toISOString().slice(0, 10)` (UTC), which caused the day to flip at ~7–8pm EST
+- Fixed in `sessionColor.ts`, `page.tsx` (onSessionColorChange), and `SettingsPanel.tsx` to use `toLocaleDateString('en-CA')` (returns `YYYY-MM-DD` in local time)
+- Yesterday calculation in `SettingsPanel.tsx` changed from `setUTCDate` to `setDate` to match local timezone
+
 ## Key Files
 - `src/components/Canvas.tsx` — all visual rendering, wrapText, hierarchy styles, session color, timestamps
-- `src/components/SettingsPanel.tsx` — settings panel UI
+- `src/components/SettingsPanel.tsx` — settings panel UI; Colors section with session color rows + past sessions dropdown
+- `src/components/PastSessionsDropdown.tsx` — `SessionColorRow` and `PastSessionsDropdown` components (new)
+- `src/app/api/canvases/[id]/session-colors/route.ts` — GET + PATCH session color API (new)
 - `src/lib/settings.ts` — `CanvasSettings` interface, `DEFAULT_SETTINGS`, `useSettings` hook
-- `src/lib/sessionColor.ts` — palette + `getSessionColor()`
+- `src/lib/sessionColor.ts` — palette + `getSessionColor()`; now uses local timezone
 - `src/app/globals.css` — spinner arrows hidden

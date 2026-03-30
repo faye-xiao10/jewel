@@ -41,14 +41,15 @@ Next.js App Router · React 19 · TypeScript · Drizzle ORM · Neon Postgres + p
 - Run `/cost` periodically to monitor context usage
 
 **End of session** (triggers: "wrap up", "done", "update docs", "end of feature"):
-1. `pnpm lint && pnpm tsc --noEmit` — fix all errors
-2. `find src -type f | sort` — get current file tree
-3. Update `BUILT.md` file tree only — reflects current state of `src/`
-4. Update `DATA_MODEL.md` only if schema changed
-5. For each feature file touched this session (`docs/features/[name].md`):
+1. Output a summary of all changes made this session — files touched, what changed, why — and wait for approval before proceeding
+2. `pnpm lint && pnpm tsc --noEmit` — fix all errors
+3. `find src -type f | sort` — get current file tree
+4. Update `BUILT.md` file tree only — reflects current state of `src/` and `docs`
+5. Update `DATA_MODEL.md` only if schema changed
+6. For each feature file touched this session (`docs/features/[name].md`):
    - Add a new dated entry under `## Built` describing what changed
    - Update the `## Key Files` section — add any new files, annotate changed ones
-6. `git add -A` then ONE commit with everything — feature files + docs together. Format: "feat/fix/docs/refactor: description" + bullet points per file.
+7. `git add -A` then ONE commit with everything — feature files + docs together. Format: "feat/fix/docs/refactor: description" + bullet points per file.
 
 ## Docs (load only what's needed)
 | File | Load when |
