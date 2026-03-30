@@ -60,12 +60,17 @@ export function PastSessionsDropdown({ sessions, formatDate, onConfirm }: {
   const [open, setOpen] = useState(false)
   const [dropPos, setDropPos] = useState({ top: 0, right: 0, width: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
-
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  
   useEffect(() => {
     if (!open) return
-    function close() { setOpen(false) }
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
+    function close(e: MouseEvent) {
+      if (dropdownRef.current?.contains(e.target as Node)) return
+      if (triggerRef.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
   }, [open])
 
   function toggle(e: React.MouseEvent) {
@@ -97,6 +102,7 @@ export function PastSessionsDropdown({ sessions, formatDate, onConfirm }: {
       </button>
       {open && (
         <div
+          ref={dropdownRef}
           className="rounded-lg shadow-xl overflow-y-auto"
           style={{
             position: 'fixed',
