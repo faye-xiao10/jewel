@@ -68,6 +68,13 @@ export default function NodePopover({
       onNodeMove(node.id, node.x - settings.tabIndentX, node.y)
       return
     }
+    if (e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault()
+      const dx = e.key === 'ArrowRight' ? settings.tabIndentX : e.key === 'ArrowLeft' ? -settings.tabIndentX : 0
+      const dy = e.key === 'ArrowDown' ? settings.shiftEnterIndentY : e.key === 'ArrowUp' ? -settings.shiftEnterIndentY : 0
+      onNodeMove(node.id, node.x + dx, node.y + dy)
+      return
+    }
     if (e.key === 'Tab') {
       e.preventDefault()
       const text = textareaRef.current?.value ?? ''
