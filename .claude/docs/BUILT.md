@@ -22,7 +22,9 @@ src/
   app/
     api/
       canvases/
-        [id]/route.ts
+        [id]/
+          route.ts
+          session-colors/route.ts
         route.ts
       edges/
         [id]/route.ts
@@ -36,7 +38,10 @@ src/
     page.tsx
   components/
     Canvas.tsx
+    Markdown.tsx
+    Markdown/markdown.css
     NodePopover.tsx
+    PastSessionsDropdown.tsx
     SettingsPanel.tsx
   lib/
     db.ts
@@ -49,14 +54,4 @@ src/
     index.ts
   types/
     index.ts
-docs/
-  features/
-    canvas-interactions.md
-    node-editing.md
-    appearance.md
-    persistence.md
-    auth.md
-    voice-input.md
-    streak.md
-    polish-and-ship.md
 ```
