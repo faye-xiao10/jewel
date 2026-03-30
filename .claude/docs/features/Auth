@@ -1,0 +1,25 @@
+# Auth + Canvas Management
+
+## Plan
+
+- NextAuth with Google OAuth
+- User table + associate canvases to users
+- Left sidebar: list of user's canvases, create new, rename, delete
+- Canvas switcher — clicking a canvas in sidebar loads it
+- Default canvas name: "Untitled Canvas" (click to rename inline)
+- Redirect unauthenticated users to sign-in page
+- Sign-out button
+
+## Acceptance
+
+- Sign in with Google works, session persists
+- Each user only sees their own canvases
+- Create new canvas → appears in sidebar → loads blank canvas
+- Rename canvas inline in sidebar
+- Delete canvas (with confirmation) removes it and all nodes/edges
+- Switching canvases loads correct state
+- Sign-out clears session, redirects to sign-in
+
+## Built
+
+_Not yet started._

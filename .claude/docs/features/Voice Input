@@ -1,0 +1,21 @@
+# Voice Input
+
+## Plan
+
+- Mic button inside the node edit popover
+- Web Speech API (SpeechRecognition) — browser-native, free, no API key
+- Hold to record, release to stop → transcribed text appends to node
+- Visual indicator while recording (pulsing mic icon)
+- Graceful fallback if browser doesn't support speech API
+
+## Acceptance
+
+- Mic button visible in node edit popover
+- Clicking mic starts recording, button pulses
+- Transcribed text appears in node text field
+- Multiple recordings append to existing text
+- Error shown gracefully if speech not supported
+
+## Built
+
+_Not yet started._

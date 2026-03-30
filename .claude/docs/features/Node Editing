@@ -1,0 +1,43 @@
+# Node Editing
+
+## Plan
+
+- Click node → inline edit popover (textarea, auto-focused)
+- Save on blur or Enter
+- Escape closes popover
+- Delete node via button or keyboard
+---
+- Voice input via Web Speech API (Stage 4)
+
+## Built
+
+### Stage 1 (2026-03-27)
+- `NodePopover.tsx` — floating edit popover, textarea auto-focused on open
+- Save on blur or Enter, Escape closes
+
+### Post-Stage 2 Polish (2026-03-28)
+
+**Bug fixes:**
+- Ghost node bug: `onSave` firing on blur after discard was writing empty nodes to DB. Fixed with `discardedRef` — a Set that marks node IDs as discarded before any save can fire
+- Popover re-opening bug: `setSelectedNode(saved)` after temp node save re-opened popover. Changed to `setSelectedNode(null)`
+- Double node creation on blur: clicking away fired both `onSave` (blur) and `onNodeCreate` (canvas click). Fixed by setting `suppressNextCreateRef.current = true` at top of `onSave`
+
+**Keyboard shortcuts:**
+- `Enter` — saves and closes
+- `Escape` — discards if empty, closes
+- `Tab` on empty node — moves node right by `tabIndentX`
+- `Shift+Tab` — moves node left by `tabIndentX`
+- `Tab` on filled node — saves current node, creates child at `(x + tabIndentX, y + tabIndentY)` with explicit edge
+- `Shift+Enter` — saves current node, creates new node below at `(x, y + shiftEnterIndentY)` with explicit edge
+- `Shift+Arrow` — repositions current node in arrow direction using `tabIndentX` (left/right) and `shiftEnterIndentY` (up/down); works on empty or filled nodes; does not save or create
+- `Delete`/`Backspace` — deletes all selected nodes when selection active and no textarea focused
+- Tab/Shift+Enter await `onSave` before calling `onNodeCreateFromEdge` so real node ID is used as edge source
+- `onSave` returns `Promise<string>` (real node ID after DB write)
+
+**Other:**
+- "Select subtree" button in popover triggers BFS subtree selection
+- Delete button in popover with immediate confirm
+
+## Key Files
+- `src/components/NodePopover.tsx` — popover UI + all keyboard handling
+- `src/app/page.tsx` — `onSave`, `onDiscard`, `onDelete`, `discardedRef`, `suppressNextCreateRef`

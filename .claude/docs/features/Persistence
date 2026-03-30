@@ -1,0 +1,52 @@
+# Persistence
+
+## Plan
+
+- Drizzle schema: canvases, nodes, edges tables
+- Neon Postgres connection + migrations
+- API routes for all CRUD operations
+- Optimistic updates — UI updates instantly, API call in background
+- Single hardcoded canvas (no auth yet)
+- Loading state on initial canvas fetch
+
+## Built
+
+### Stage 2 (2026-03-27)
+
+**Write-on-save flow:**
+- Click/long-press creates a temp node (`temp_${Date.now()}`) in local state only — no DB write
+- Temp metadata (explicitFromId, tempEdgeId) stored in `tempMetaRef`
+- `onSave`: if id starts with `temp_`, POSTs to `/api/nodes` with text + position, reconciles temp IDs with real IDs in nodes and edges state
+- `onDiscard`: removes temp node/edge from state only — no DB call
+- `onDelete`: optimistic remove + DELETE API with rollback on failure
+- `onNodeMove`: updates state; skips PATCH for temp nodes
+
+**API routes (all wrap DB calls in `withRetry`):**
+- `GET/POST /api/canvases` — list all / create
+- `GET/PATCH/DELETE /api/canvases/[id]` — fetch with nodes+edges / rename / delete
+- `POST /api/nodes` — insert node, auto-nearest edge or explicitFromId
+- `PATCH/DELETE /api/nodes/[id]` — partial update / delete cascade
+- `POST /api/edges` — create edge, validates no self-loops
+- `DELETE /api/edges/[id]` — delete edge
+
+**Ghost node filter:** nearest-node query excludes nodes with no text and no url to prevent ghost nodes poisoning future edge connections.
+
+### Post-Stage 2 Bugfixes (2026-03-28)
+
+- **Ghost edge on discard:** `tempMetaRef.current.set` was inside `setNodes` updater — React timing meant it wasn't set when `onDiscard` fired. Fixed by moving ref operations outside the callback using `nodesRef.current`
+- **Canvas creation on failed load:** fetch failure was silently clearing localStorage and creating a new canvas, losing the user's canvas ID. Fixed to surface the error and return early
+
+### Session Color Persistence (2026-03-29)
+- `color` column added to both `nodes` and `edges` tables (migration `0001_gifted_elektra.sql`)
+- `POST /api/nodes` accepts `color` + `edgeColor`, persists to both inserts
+- `POST /api/edges` accepts `color`, persists to edge insert
+
+## Key Files
+- `src/schema/index.ts` — Drizzle table definitions
+- `src/lib/db.ts` — Drizzle client singleton
+- `src/lib/retry.ts` — `withRetry` with exponential backoff + jitter
+- `src/app/api/canvases/route.ts`, `[id]/route.ts`
+- `src/app/api/nodes/route.ts`, `[id]/route.ts`
+- `src/app/api/edges/route.ts`, `[id]/route.ts`
+- `drizzle/migrations/` — auto-generated migration files
+- `scripts/migrate.mjs` — one-off migration runner for Neon HTTP driver

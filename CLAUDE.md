@@ -30,7 +30,8 @@ Next.js App Router · React 19 · TypeScript · Drizzle ORM · Neon Postgres + p
 
 **Start of session:**
 1. Read `BUILT.md` to understand current state
-2. Only read additional docs if needed for this specific step:
+2. Read `docs/features/[name].md` for the feature being worked on — use `## Key Files` to load only the files relevant to this feature for context
+3. Only read additional docs if needed:
    - Writing queries or schema changes → read `DATA_MODEL.md`
    - Unclear on pipeline/API connections → read `ARCHITECTURE.md`
    - Building UI → read `STYLE.md`
@@ -42,18 +43,21 @@ Next.js App Router · React 19 · TypeScript · Drizzle ORM · Neon Postgres + p
 **End of session** (triggers: "wrap up", "done", "update docs", "end of feature"):
 1. `pnpm lint && pnpm tsc --noEmit` — fix all errors
 2. `find src -type f | sort` — get current file tree
-3. Update `BUILT.md`: what was built, files changed, current file tree
+3. Update `BUILT.md` file tree only — reflects current state of `src/`
 4. Update `DATA_MODEL.md` only if schema changed
-5. 5. `git add -A` then ONE commit with everything — feature files + docs together. Format: "feat/fix/docs/refactor: Step N — description" + bullet points per file.
+5. For each feature file touched this session (`docs/features/[name].md`):
+   - Add a new dated entry under `## Built` describing what changed
+   - Update the `## Key Files` section — add any new files, annotate changed ones
+6. `git add -A` then ONE commit with everything — feature files + docs together. Format: "feat/fix/docs/refactor: description" + bullet points per file.
 
 ## Docs (load only what's needed)
 | File | Load when |
 |------|-----------|
-| `PLAN.md` | Starting a new step, checking acceptance criteria |
+| `BUILT.md` | Start of every session (always) |
 | `ARCHITECTURE.md` | Unclear how a feature connects to pipeline or D3 |
 | `DATA_MODEL.md` | Writing queries, migrations, or schema changes |
-| `BUILT.md` | Start of every session (always) |
 | `STYLE.md` | Building any UI component |
+| `docs/features/[name].md` | Working on a specific feature — load only the relevant file |
 
 ## Environment Variables
 Never log, echo, or commit values. See `.env.local.example` for full list.

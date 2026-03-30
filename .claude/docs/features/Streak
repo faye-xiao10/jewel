@@ -1,0 +1,25 @@
+# Polish + Ship
+
+## Plan
+
+- Node appear animation on creation
+- Edge design: curved arrows (D3 quadratic bezier), arrowhead polish
+- Canvas empty state: ghost text "tap anywhere to add a thought" fades after first node
+- Mobile: basic touch support (tap to create, tap to edit)
+- Error boundaries on canvas component
+- README: setup instructions, architecture, screenshots
+- Deploy to Vercel
+
+## Acceptance
+
+- Nodes animate in on creation
+- Edges are curved with clean arrowheads
+- Empty state shows and disappears correctly
+- `pnpm lint` zero errors
+- `pnpm tsc --noEmit` zero errors
+- Deployed to Vercel, live link works
+- README complete
+
+## Built
+
+_Not yet started._

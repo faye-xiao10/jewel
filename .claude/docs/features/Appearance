@@ -1,0 +1,52 @@
+# Appearance
+
+## Plan
+
+- Markdown-style heading hierarchy on node labels
+- Session-based color coding
+- Hover timestamps
+---
+- Node design polish: smooth appear animation, subtle hover state
+- Canvas empty state: ghost text fades out after first node
+
+## Built
+
+### Markdown Hierarchy (2026-03-28)
+- Node labels styled by `#` prefix: `# ` = H1, `## ` = H2, `### ` = H3
+- Font size and weight vary by heading level
+- `#` prefix stripped from display label
+- Text wrapping via `wrapText()` helper using `<tspan>` elements — wrap length configurable via settings
+- Question nodes: if `node.text` ends with `?`, node dot and label render in `questionColor`
+
+### Settings Panel (2026-03-28)
+- Gear icon (top-right) opens settings panel
+- Settings persisted to `localStorage` under key `jewel_settings`
+- Configurable: H1/H2/H3/default font sizes, node color, edge color, question color, wrap length, Tab indent X/Y, Shift+Enter indent Y
+- Each setting has a slider + typeable number input (stay in sync)
+- Color settings have a color picker + typeable hex input
+- Fixed 300px width, no horizontal scroll
+- Reset to defaults button
+- Spinner arrows hidden on number inputs via `globals.css`
+
+### Session Colors (2026-03-29)
+- Each browser session gets one color from a 6-color palette: `#e879f9`, `#34d399`, `#fb923c`, `#38bdf8`, `#f472b6`, `#a78bfa`
+- Color index cycles via `jewel_session_color_index` in `localStorage` — each page load picks the next color
+- `getSessionColor()` in `src/lib/sessionColor.ts`
+- On node creation, both `color` and `edgeColor` set to session color, persisted to DB
+- Canvas renders: node fill = `node.color ?? settings.nodeColor`; edge stroke = `edge.color ?? settings.edgeColor`
+- Temp nodes/edges carry session color before DB write for consistent rendering
+
+**Bugfix (2026-03-29):** Was storing index in sessionStorage — new tabs shared it so color never changed. Rewrote to use localStorage for index only, no color caching.
+
+### Hover Timestamps (2026-03-29)
+- `mouseover` on any node group appends `<text class="timestamp-label">` below the node dot at `y = NODE_R + 18`
+- Format: `toLocaleString` with `{ month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }` — e.g. "Mar 28, 2:14 PM"
+- Style: `font-size: 9px`, `fill: #666`, `opacity: 0.6`, centered
+- `mouseleave` removes the element
+
+## Key Files
+- `src/components/Canvas.tsx` — all visual rendering, wrapText, hierarchy styles, session color, timestamps
+- `src/components/SettingsPanel.tsx` — settings panel UI
+- `src/lib/settings.ts` — `CanvasSettings` interface, `DEFAULT_SETTINGS`, `useSettings` hook
+- `src/lib/sessionColor.ts` — palette + `getSessionColor()`
+- `src/app/globals.css` — spinner arrows hidden

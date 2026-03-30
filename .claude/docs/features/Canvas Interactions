@@ -1,0 +1,42 @@
+# Canvas Interactions
+
+## Plan
+
+- D3 canvas component mounted in a React ref
+- Pan (drag background) + zoom (scroll/pinch)
+- Tap empty space → node appears at click coordinates
+- Auto-edge: nearest existing node connected on creation (Euclidean distance)
+- First node → no edge (nothing to connect to)
+- Drag a node → repositions it, edges stretch live
+- Long-press node + drag outward → rubber-band preview line → release creates new node with explicit edge from source
+- Long-press + release on existing node → edge only, no new node
+- Long-press + release within 10px of origin → treated as click, no creation
+- Long-press threshold: 300ms
+
+## Built
+
+### Stage 1 (2026-03-27)
+Full canvas interaction shipped:
+- D3 SVG mounted in `useRef`, zoom + pan via D3 zoom behavior
+- Click empty space → node at click coords, auto-connect to nearest neighbor
+- Drag node → live edge stretch, PATCH on drag end
+- Long-press edge-draw mode: rubber-band dashed line from source, release creates node + explicit edge
+- All state in React `useState` (no DB yet)
+
+### Post-Stage 2 Polish (2026-03-28)
+- Ghost edge on multi-select drag end fixed: canvas click after drag was creating a spurious node. Fixed by checking `selectedNodeIds.size > 0` in click handler and returning early
+
+### Multi-select (2026-03-28)
+- Shift+click a node = select entire subtree rooted at that node (BFS via `src/lib/subtree.ts`)
+- Dragging a selected node when multiple are selected moves all together, PATCHes all on drag end
+- Click empty space clears selection
+- `selectedNodeIds: Set<string>` state in `page.tsx`, passed to Canvas as prop
+- Selection ring rendered as `circle.select-ring` in D3, opacity toggled by selection state
+- Small hint bar at bottom: "N nodes selected · Press Delete to remove"
+- `multiDragRef` tracks per-node offset during group drag
+
+## Key Files
+- `src/components/Canvas.tsx` — all D3 canvas logic
+- `src/lib/nearest.ts` — Euclidean nearest-node util
+- `src/lib/subtree.ts` — BFS subtree traversal
+- `src/app/page.tsx` — owns node/edge state, passes callbacks to Canvas
