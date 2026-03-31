@@ -27,8 +27,8 @@
 - `Escape` — discards if empty, closes
 - `Tab` on empty node — moves node right by `tabIndentX`
 - `Shift+Tab` — moves node left by `tabIndentX`
-- `Tab` on filled node — saves current node, creates child at `(x + tabIndentX, y + tabIndentY)` with explicit edge
-- `Shift+Enter` — saves current node, creates new node below at `(x, y + shiftEnterIndentY)` with explicit edge
+- `Tab` on filled node — saves current node, creates child at `(x + tabIndentX, calcDynamicY(text))` with explicit edge
+- `Shift+Enter` — saves current node, creates new node below at `(x, calcDynamicY(text))` with explicit edge
 - `Shift+Arrow` — repositions current node in arrow direction using `tabIndentX` (left/right) and `shiftEnterIndentY` (up/down); works on empty or filled nodes; does not save or create
 - `Delete`/`Backspace` — deletes all selected nodes when selection active and no textarea focused
 - Tab/Shift+Enter await `onSave` before calling `onNodeCreateFromEdge` so real node ID is used as edge source
@@ -37,6 +37,8 @@
 **Other:**
 - "Select subtree" button in popover triggers BFS subtree selection
 - Delete button in popover with immediate confirm
+- `calcDynamicY(text)` — computes child Y as `node.y + Math.ceil(text.length / wrapLength) * defaultSize + shiftEnterIndentY`
+
 
 ## Key Files
 - `src/components/NodePopover.tsx` — popover UI + all keyboard handling

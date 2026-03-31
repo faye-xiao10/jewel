@@ -15,8 +15,6 @@ interface NodePopoverProps {
   onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
   onNodeMove: (id: string, x: number, y: number) => void
   onSubtreeSelect: (id: string) => void
-
-
 }
 
 export default function NodePopover({
@@ -29,7 +27,7 @@ export default function NodePopover({
   onClose,
   onNodeCreateFromEdge,
   onNodeMove,
-  onSubtreeSelect, 
+  onSubtreeSelect,
 }: NodePopoverProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -52,6 +50,12 @@ export default function NodePopover({
       onSave(node.id, text)
     }
     onClose()
+  }
+
+  function calcDynamicY(text: string): number {
+    const lineCount = Math.ceil(text.length / settings.wrapLength)
+    const lineHeight = settings.defaultSize
+    return node.y + lineCount * lineHeight + settings.shiftEnterIndentY
   }
 
   async function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -83,7 +87,7 @@ export default function NodePopover({
         return
       }
       const savedId = await onSave(node.id, text)
-      onNodeCreateFromEdge(savedId, node.x + settings.tabIndentX, node.y + settings.tabIndentY)
+      onNodeCreateFromEdge(savedId, node.x + settings.tabIndentX, calcDynamicY(text))
       return
     }
     if (e.key === 'Enter' && e.shiftKey) {
@@ -91,7 +95,7 @@ export default function NodePopover({
       const text = textareaRef.current?.value ?? ''
       if (!text.trim()) return
       const savedId = await onSave(node.id, text)
-      onNodeCreateFromEdge(savedId, node.x, node.y + settings.shiftEnterIndentY)
+      onNodeCreateFromEdge(savedId, node.x, calcDynamicY(text))
       return
     }
   }
@@ -131,7 +135,7 @@ export default function NodePopover({
         placeholder="Type something…"
         className="w-full bg-transparent px-3 py-1 text-sm text-slate-100 placeholder-slate-500 resize-none outline-none"
       />
-      <div className="flex px-1 ">
+      <div className="flex px-1">
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => { onSubtreeSelect(node.id); onClose() }}
@@ -139,16 +143,16 @@ export default function NodePopover({
         >
           Select subtree
         </button>
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              onDelete(node.id)
-              onClose()
-            }}
-            className="w-full rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/30 transition-colors mb-1"
-          >
-            Delete node
-          </button>
+        <button
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onDelete(node.id)
+            onClose()
+          }}
+          className="w-full rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/30 transition-colors mb-1"
+        >
+          Delete node
+        </button>
       </div>
     </div>
   )
