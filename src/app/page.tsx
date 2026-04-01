@@ -8,11 +8,11 @@ import { findNearest } from '@/lib/nearest'
 import { getSessionColor } from '@/lib/sessionColor'
 import { useSettings } from '@/lib/settings'
 import type { Node, Edge } from '@/types'
-import { getSubtreeIds, subtreeToMarkdown } from '@/lib/subtree'
+import { getSubtreeIds, subtreeToMarkdown, wouldFormCycle } from '@/lib/subtree'
 
 const CANVAS_ID_KEY = 'jewel_canvas_id'
 
-function HintBar({ count, charCount, onCopy }: { count: number; charCount: number; onCopy: () => void }) {
+function HintBar({ count, charCount, onCopy, onDetach }: { count: number; charCount: number; onCopy: () => void; onDetach?: () => void }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = () => {
     onCopy()
@@ -34,6 +34,17 @@ function HintBar({ count, charCount, onCopy }: { count: number; charCount: numbe
       >
         {copied ? 'Copied!' : 'Copy Text'}
       </button>
+      {onDetach && (
+        <button
+          onClick={onDetach}
+          className="px-3 py-1 rounded-full text-xs transition"
+          style={{ background: 'rgba(255,255,255,0.1)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.2)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)' }}
+        >
+          Detach
+        </button>
+      )}
     </div>
   )
 }
@@ -75,6 +86,7 @@ export default function Home() {
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set())
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 })
   const [loading, setLoading] = useState(true)
+  const [edgeError, setEdgeError] = useState<{ message: string; x: number; y: number } | null>(null)
   const canvasIdRef = useRef<string | null>(null)
   const sessionColorRef = useRef<string>('')
   const suppressNextCreateRef = useRef(false)
@@ -127,6 +139,61 @@ export default function Home() {
     const markdown = subtreeToMarkdown(nodes, edges, selectedNodeIds, rootId)
     navigator.clipboard.writeText(markdown)
   }, [nodes, edges, selectedNodeIds])
+
+  const showEdgeError = useCallback((message: string, nodeId: string) => {
+    const node = nodesRef.current.find((n) => n.id === nodeId)
+    if (!node) return
+    const x = node.x * transform.k + transform.x
+    const y = node.y * transform.k + transform.y
+    setEdgeError({ message, x, y })
+    setTimeout(() => setEdgeError(null), 2000)
+  }, [transform])
+
+  const onEdgeCreate = useCallback(async (sourceId: string, targetId: string) => {
+    const alreadyHasParent = edges.some((e) => e.toId === targetId)
+    if (alreadyHasParent) {
+      showEdgeError('Already has a parent', targetId)
+      return
+    }
+    if (wouldFormCycle(sourceId, targetId, edges)) {
+      showEdgeError('Would create a cycle', targetId)
+      return
+    }
+    const canvasId = canvasIdRef.current
+    if (!canvasId) return
+    const now = new Date().toISOString()
+    const tempEdgeId = `temp_edge_${Date.now()}`
+    const color = sessionColorRef.current || undefined
+    const tempEdge: Edge = { id: tempEdgeId, canvasId, fromId: sourceId, toId: targetId, color, createdAt: now }
+    setEdges((prev) => [...prev, tempEdge])
+    try {
+      const res = await fetch('/api/edges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canvasId, fromId: sourceId, toId: targetId, color: sessionColorRef.current || null }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const realEdge = toEdge(await res.json())
+      setEdges((prev) => prev.map((e) => e.id === tempEdgeId ? realEdge : e))
+    } catch {
+      setEdges((prev) => prev.filter((e) => e.id !== tempEdgeId))
+    }
+  }, [edges, showEdgeError])
+
+  const onDetach = useCallback(() => {
+    // Find the root: selected node with no incoming edge from another selected node
+    const rootId = [...selectedNodeIds].find(
+      (id) => !edges.some((e) => e.toId === id && selectedNodeIds.has(e.fromId))
+    )
+    if (!rootId) return
+    const parentEdge = edges.find((e) => e.toId === rootId)
+    if (!parentEdge) return
+    setEdges((prev) => prev.filter((e) => e.id !== parentEdge.id))
+    if (!parentEdge.id.startsWith('temp_')) {
+      fetch(`/api/edges/${parentEdge.id}`, { method: 'DELETE' })
+    }
+    setSelectedNodeIds(new Set())
+  }, [selectedNodeIds, edges])
 
   const onNodeCreate = useCallback((x: number, y: number) => {
     if (suppressNextCreateRef.current) {
@@ -250,7 +317,8 @@ export default function Home() {
             x: node.x,
             y: node.y,
             text: text.trim() || null,
-            ...(sessionColor ? { color: sessionColor, edgeColor: sessionColor } : {}),
+            color: sessionColor ?? null,
+            edgeColor: sessionColor ?? null,
             ...(meta.explicitFromId ? { explicitFromId: meta.explicitFromId } : {}),
           }),
         })
@@ -366,6 +434,7 @@ export default function Home() {
         sessionColor={sessionColorRef.current}
         onNodeCreate={onNodeCreate}
         onNodeCreateFromEdge={onNodeCreateFromEdge}
+        onEdgeCreate={onEdgeCreate}
         onNodeMove={onNodeMove}
         onNodeMoveMulti={onNodeMoveMulti}
         onNodeSelect={onNodeSelect}
@@ -397,6 +466,7 @@ export default function Home() {
             .filter((n) => selectedNodeIds.has(n.id))
             .reduce((sum, n) => sum + (n.text ?? '').length, 0)}
           onCopy={handleCopySubtree}
+          onDetach={ onDetach }
         />
       )}
       <SettingsPanel
@@ -406,6 +476,19 @@ export default function Home() {
         canvasId={canvasIdRef.current ?? ''}
         onSessionColorChange={onSessionColorChange}
       />
+      {edgeError && (
+        <div
+          className="absolute z-50 px-2 py-1 rounded text-xs text-white pointer-events-none"
+          style={{
+            background: 'rgba(239,68,68,0.85)',
+            left: edgeError.x + 12,
+            top: edgeError.y - 24,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          {edgeError.message}
+        </div>
+      )}
     </div>
   )
 }
