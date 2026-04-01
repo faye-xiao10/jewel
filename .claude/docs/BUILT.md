@@ -1,7 +1,7 @@
 # BUILT.md
 
 ## Current State
-Stage 2 complete + post-stage polish. Full persistence layer with Drizzle + Neon. Nodes are only written to DB when the user saves content — never on bare click. State survives refresh via localStorage canvas ID. Canvas settings persisted to localStorage.
+Stage 2 complete + post-stage polish. Full persistence layer with Drizzle + Neon. Nodes are only written to DB when the user saves content — never on bare click. State survives refresh via localStorage canvas ID. Canvas settings persisted to localStorage. Subtree copy-as-markdown implemented (Cmd/Ctrl+C or hint bar button).
 
 ## Feature Docs
 

@@ -35,8 +35,14 @@ Full canvas interaction shipped:
 - Small hint bar at bottom: "N nodes selected · Press Delete to remove"
 - `multiDragRef` tracks per-node offset during group drag
 
+### Subtree copy as markdown (2026-04-01)
+- `subtreeToMarkdown(nodes, edges, selectedIds, rootId)` added to `src/lib/subtree.ts`: BFS over selected-only edges, depth-tracked, formats as `"  ".repeat(depth) + "- " + text`, skips empty/null text
+- `onCopySubtree?` prop added to Canvas; `useEffect` listens for `Cmd/Ctrl+C` when selection is non-empty, fires callback + prevents default
+- `handleCopySubtree` in `page.tsx`: detects root (node with no incoming edge from another selected node), calls `subtreeToMarkdown`, writes to `navigator.clipboard`
+- `HintBar` component in `page.tsx`: shows node count + char count + "Copy Text" button with 1.5s "Copied!" feedback; replaces old inline hint bar div
+
 ## Key Files
 - `src/components/Canvas.tsx` — all D3 canvas logic
 - `src/lib/nearest.ts` — Euclidean nearest-node util
-- `src/lib/subtree.ts` — BFS subtree traversal
-- `src/app/page.tsx` — owns node/edge state, passes callbacks to Canvas
+- `src/lib/subtree.ts` — BFS subtree traversal + markdown export
+- `src/app/page.tsx` — owns node/edge state, HintBar, copy handler
