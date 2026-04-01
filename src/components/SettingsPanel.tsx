@@ -26,8 +26,8 @@ export default function SettingsPanel({ settings, onUpdate, onReset, canvasId, o
   const pastSessions = sessions.filter(s => s.date !== todayStr)
 
   useEffect(() => {
-    fetch(`/api/canvases/${canvasId}/session-colors`)
-      .then(r => r.json())
+    const offset = -new Date().getTimezoneOffset()
+    fetch(`/api/canvases/${canvasId}/session-colors?offset=${offset}`)      .then(r => r.json())
       .then(d => setSessions(d.sessions ?? []))
       .catch(() => {})
   }, [canvasId])
@@ -38,7 +38,7 @@ export default function SettingsPanel({ settings, onUpdate, onReset, canvasId, o
       const res = await fetch(`/api/canvases/${canvasId}/session-colors`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, color }),
+        body: JSON.stringify({ date, color, offset: -new Date().getTimezoneOffset() }),
       })
       if (res.ok) onSessionColorChange(date, color)
     } catch {}

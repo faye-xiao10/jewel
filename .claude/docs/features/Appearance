@@ -51,6 +51,9 @@
 - `SessionColorRow`: color picker + hex input + confirm checkmark (enabled only when dirty) — confirm fires PATCH then calls `onSessionColorChange` callback to repaint canvas without reload
 - `PastSessionsDropdown`: pill trigger with rotating chevron; opens `position: fixed` floating list anchored via `getBoundingClientRect()`; closes on outside click via document listener; max-height 240px scrollable
 - `onSessionColorChange` in `page.tsx`: updates `sessionColorRef.current` when date is today (so new nodes immediately use the new color), then remaps nodes/edges using `new Date(n.createdAt).toLocaleDateString('en-CA') === date` for local-timezone correctness
+- Session-colors GET now accepts `?offset=-240` (minutes from UTC) and shifts `created_at` by that interval before date-truncating, so grouping respects local timezone. Uses subquery to alias the expression as `local_date` to satisfy Postgres `DISTINCT ON` / `ORDER BY` matching requirement.
+- Session-colors PATCH now accepts `offset` in request body and shifts day boundaries accordingly.
+- `SettingsPanel.tsx` passes `-new Date().getTimezoneOffset()` as `offset` on both GET and PATCH calls.
 
 ### Local Timezone Fix (2026-03-30)
 - All session date keys were using `toISOString().slice(0, 10)` (UTC), which caused the day to flip at ~7–8pm EST
