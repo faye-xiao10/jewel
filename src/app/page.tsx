@@ -8,9 +8,35 @@ import { findNearest } from '@/lib/nearest'
 import { getSessionColor } from '@/lib/sessionColor'
 import { useSettings } from '@/lib/settings'
 import type { Node, Edge } from '@/types'
-import { getSubtreeIds } from '@/lib/subtree'
+import { getSubtreeIds, subtreeToMarkdown } from '@/lib/subtree'
 
 const CANVAS_ID_KEY = 'jewel_canvas_id'
+
+function HintBar({ count, charCount, onCopy }: { count: number; charCount: number; onCopy: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    onCopy()
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <div
+      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-3 py-1.5 rounded-lg text-xs text-slate-400"
+      style={{ background: '#1e293b', border: '1px solid #334155' }}
+    >
+      <span>{count} node{count > 1 ? 's' : ''} selected · {charCount} chars · Press Delete to remove</span>
+      <button
+        onClick={handleCopy}
+        className="px-3 py-1 rounded-full text-xs transition"
+        style={{ background: 'rgba(255,255,255,0.1)' }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.2)' }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)' }}
+      >
+        {copied ? 'Copied!' : 'Copy Text'}
+      </button>
+    </div>
+  )
+}
 
 interface TempMeta {
   explicitFromId?: string
@@ -91,7 +117,16 @@ export default function Home() {
   const handleSubtreeSelect = useCallback((rootId: string) => {
     setSelectedNodeIds(getSubtreeIds(rootId, edges))
   }, [edges])
-  
+
+  const handleCopySubtree = useCallback(() => {
+    if (selectedNodeIds.size === 0) return
+    const rootId = [...selectedNodeIds].find(
+      (id) => !edges.some((e) => e.toId === id && selectedNodeIds.has(e.fromId))
+    )
+    if (!rootId) return
+    const markdown = subtreeToMarkdown(nodes, edges, selectedNodeIds, rootId)
+    navigator.clipboard.writeText(markdown)
+  }, [nodes, edges, selectedNodeIds])
 
   const onNodeCreate = useCallback((x: number, y: number) => {
     if (suppressNextCreateRef.current) {
@@ -338,6 +373,7 @@ export default function Home() {
         onClearSelection={onClearSelection}
         onTransformChange={setTransform}
         onSubtreeSelect={handleSubtreeSelect}
+        onCopySubtree={handleCopySubtree}
       />
       {selectedNodeCurrent && (
         <NodePopover
@@ -355,12 +391,13 @@ export default function Home() {
         />
       )}
       {selectedNodeIds.size > 0 && (
-        <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-lg text-xs text-slate-400"
-          style={{ background: '#1e293b', border: '1px solid #334155' }}
-        >
-          {selectedNodeIds.size} node{selectedNodeIds.size > 1 ? 's' : ''} selected · Press Delete to remove
-        </div>
+        <HintBar
+          count={selectedNodeIds.size}
+          charCount={nodes
+            .filter((n) => selectedNodeIds.has(n.id))
+            .reduce((sum, n) => sum + (n.text ?? '').length, 0)}
+          onCopy={handleCopySubtree}
+        />
       )}
       <SettingsPanel
         settings={settings}

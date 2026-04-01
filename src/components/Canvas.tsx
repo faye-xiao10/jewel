@@ -20,6 +20,7 @@ interface CanvasProps {
   onClearSelection: () => void
   onTransformChange: (t: { x: number; y: number; k: number }) => void
   onSubtreeSelect: (id: string) => void
+  onCopySubtree?: () => void
 }
 
 const BG = '#0f172a'
@@ -57,6 +58,7 @@ export default function Canvas({
   onClearSelection,
   onTransformChange,
   onSubtreeSelect,
+  onCopySubtree,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const transformRef = useRef({ x: 0, y: 0, k: 1 })
@@ -395,6 +397,17 @@ export default function Canvas({
     nodeGroup.selectAll<SVGGElement, Node>('g.node').call(drag)
   }, [nodes, edges, settings, selectedNodeIds, onNodeMove, onNodeMoveMulti, onNodeSelect, onNodeMultiSelect, onNodeCreateFromEdge, cancelEdgeDraw, onSubtreeSelect,
   ])
+
+  useEffect(() => {
+    function handleCopy(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'c') return
+      if (selectedNodeIdsRef.current.size === 0) return
+      e.preventDefault()
+      onCopySubtree?.()
+    }
+    window.addEventListener('keydown', handleCopy)
+    return () => window.removeEventListener('keydown', handleCopy)
+  }, [onCopySubtree])
 
   return (
     <svg
