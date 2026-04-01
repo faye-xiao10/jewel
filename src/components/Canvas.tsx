@@ -13,6 +13,7 @@ interface CanvasProps {
   sessionColor?: string
   onNodeCreate: (x: number, y: number) => void
   onNodeCreateFromEdge: (sourceId: string, x: number, y: number) => void
+  onEdgeCreate: (sourceId: string, targetId: string) => void
   onNodeMove: (id: string, x: number, y: number) => void
   onNodeMoveMulti: (deltas: { id: string; x: number; y: number }[]) => void
   onNodeSelect: (node: Node) => void
@@ -51,6 +52,7 @@ export default function Canvas({
   selectedNodeIds,
   onNodeCreate,
   onNodeCreateFromEdge,
+  onEdgeCreate,
   onNodeMove,
   onNodeMoveMulti,
   onNodeSelect,
@@ -364,7 +366,18 @@ export default function Canvas({
           const t = transformRef.current
           const x = (event.sourceEvent.offsetX - t.x) / t.k
           const y = (event.sourceEvent.offsetY - t.y) / t.k
-          onNodeCreateFromEdge(ed.sourceId, x, y)
+
+          // Hit-test: did we release on an existing node?
+          const hit = nodesRef.current.find((n) => {
+            if (n.id === ed.sourceId) return false
+            return Math.hypot(n.x - x, n.y - y) < NODE_R + 8
+          })
+
+          if (hit) {
+            onEdgeCreate(ed.sourceId, hit.id)
+          } else {
+            onNodeCreateFromEdge(ed.sourceId, x, y)
+          }
           ed.sourceId = ''
           return
         }
@@ -395,7 +408,7 @@ export default function Canvas({
       })
 
     nodeGroup.selectAll<SVGGElement, Node>('g.node').call(drag)
-  }, [nodes, edges, settings, selectedNodeIds, onNodeMove, onNodeMoveMulti, onNodeSelect, onNodeMultiSelect, onNodeCreateFromEdge, cancelEdgeDraw, onSubtreeSelect,
+  }, [nodes, edges, settings, selectedNodeIds, onNodeMove, onNodeMoveMulti, onNodeSelect, onNodeMultiSelect, onNodeCreateFromEdge, onEdgeCreate, cancelEdgeDraw, onSubtreeSelect,
   ])
 
   useEffect(() => {

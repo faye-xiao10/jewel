@@ -41,8 +41,19 @@ Full canvas interaction shipped:
 - `handleCopySubtree` in `page.tsx`: detects root (node with no incoming edge from another selected node), calls `subtreeToMarkdown`, writes to `navigator.clipboard`
 - `HintBar` component in `page.tsx`: shows node count + char count + "Copy Text" button with 1.5s "Copied!" feedback; replaces old inline hint bar div
 
+### Subtree detach + reattach (2026-04-01)
+- HintBar now shows "Detach" button for any selection (renders when onDetach is provided, which is always when selectedNodeIds.size > 0)
+- Detach: finds subtree root (selected node with no incoming edge from another selected node), deletes its parent edge optimistically, fires DELETE /api/edges/[id]
+- Re-attach: long-press drag from any node, release on existing node within NODE_R + 8 radius → calls onEdgeCreate(sourceId, targetId) instead of creating a new node
+- onEdgeCreate in page.tsx: rejects if target already has a parent ("Already has a parent" toast) or would form a cycle ("Would create a cycle" toast); otherwise optimistically adds temp edge → POST /api/edges with color → reconciles with real edge on success, rolls back on failure
+- wouldFormCycle(sourceId, targetId, edges) added to src/lib/subtree.ts: BFS from targetId, returns true if sourceId is reachable
+- Inline error toast: edgeError state + showEdgeError helper converts canvas coords to screen coords via current transform, renders absolutely-positioned red pill near target node, auto-clears after 2s
+- Edge color: POST /api/edges body includes color from sessionColorRef; onSave POST body always sends color and edgeColor (no longer conditional)
+
 ## Key Files
-- `src/components/Canvas.tsx` — all D3 canvas logic
+- `src/components/Canvas.tsx` — all D3 canvas logic; onEdgeCreate prop + hit detection in drag end
 - `src/lib/nearest.ts` — Euclidean nearest-node util
-- `src/lib/subtree.ts` — BFS subtree traversal + markdown export
-- `src/app/page.tsx` — owns node/edge state, HintBar, copy handler
+- `src/lib/subtree.ts` — getSubtreeIds, subtreeToMarkdown, wouldFormCycle
+- `src/app/page.tsx` — owns node/edge state, HintBar, onEdgeCreate, onDetach, showEdgeError, edgeError toast
+- `src/app/api/edges/route.ts` — POST /api/edges
+- `src/app/api/edges/[id]/route.ts` — DELETE /api/edges/[id]

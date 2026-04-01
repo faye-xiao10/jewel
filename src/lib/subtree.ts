@@ -1,5 +1,28 @@
 import type { Node, Edge } from '@/types'
 
+export function wouldFormCycle(
+  sourceId: string,
+  targetId: string,
+  edges: Edge[]
+): boolean {
+  // BFS from targetId — if we reach sourceId, adding source→target creates a cycle
+  const children = new Map<string, string[]>()
+  for (const e of edges) {
+    if (!children.has(e.fromId)) children.set(e.fromId, [])
+    children.get(e.fromId)!.push(e.toId)
+  }
+  const visited = new Set<string>()
+  const queue = [targetId]
+  while (queue.length) {
+    const id = queue.shift()!
+    if (id === sourceId) return true
+    if (visited.has(id)) continue
+    visited.add(id)
+    for (const child of children.get(id) ?? []) queue.push(child)
+  }
+  return false
+}
+
 export function getSubtreeIds(rootId: string, edges: Edge[]): Set<string> {
   const children = new Map<string, string[]>()
   for (const e of edges) {
