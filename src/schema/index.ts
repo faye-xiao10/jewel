@@ -1,9 +1,17 @@
 import { pgTable, text, real, timestamp } from 'drizzle-orm/pg-core'
 import { createId } from '@paralleldrive/cuid2'
 
+export const users = pgTable('users', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  email: text('email').notNull().unique(),
+  name: text('name'),
+  image: text('image'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})
+
 export const canvases = pgTable('canvases', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  userId: text('user_id'),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull().default('Untitled Canvas'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

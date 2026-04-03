@@ -22,4 +22,33 @@
 
 ## Built
 
-_Not yet started._
+### Auth
+- NextAuth v5 with Google OAuth provider
+- User upsert on sign-in (insert if not exists, keyed by email)
+- JWT stores `dbUserId`, session exposes it as `session.user.id`
+- `src/types/next-auth.d.ts` augments session and JWT types
+- Middleware protects `/canvas/*`, redirects unauthenticated users to `/`
+- Post-signin route redirects to most recent canvas or creates a new one
+- All API routes (`/api/nodes`, `/api/edges`, `/api/canvases`) return 401 if no session, 403 if wrong user
+
+### Landing page
+- Obsidian-inspired dark design
+- Hero: headline, subheadline, "Sign in with Google" CTA
+- 6-card features grid: The Canvas, Node Editing, Keyboard-First, Subtree Actions, Session Colors, Heading Hierarchy
+- Server component — redirects authenticated users directly to their canvas
+
+### Canvas management
+- `Sidebar.tsx`: canvas list sorted by `updatedAt DESC`, new canvas button, sign-out
+- `SidebarItem.tsx`: double-click to rename inline, single-confirm delete
+- `canvases` schema: `userId` FK added and migration applied to Neon
+
+### Collapsible sidebar
+- Framer Motion animates width `0 ↔ 260px` on toggle
+- `SidebarToggle.tsx`: fixed top-left button with document icon SVG
+- `SidebarContext.tsx`: `isOpen` + `toggle` in React context, persisted to `localStorage` (`jewel-sidebar-open`)
+- `src/app/canvas/layout.tsx`: wraps all canvas routes in `SidebarProvider` so state survives canvas switches
+
+### Stable canvas switching
+- Removed full-page loading spinner; loading state now scoped to canvas area only
+- Sidebar stays mounted during canvas loads — no remount, no flicker
+- `Sidebar` reads `currentCanvasId` from `usePathname()` instead of a prop, eliminating refetch and item flicker on navigation
