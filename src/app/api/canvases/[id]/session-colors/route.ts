@@ -1,14 +1,28 @@
 import { NextResponse } from 'next/server'
 import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { nodes, edges } from '@/schema'
+import { nodes, edges, canvases } from '@/schema'
 import { withRetry } from '@/lib/retry'
+import { auth } from '@/lib/auth'
 
 type Params = { params: Promise<{ id: string }> }
 
+async function getOwnedCanvas(canvasId: string, userId: string) {
+  const [canvas] = await db.select({ userId: canvases.userId }).from(canvases).where(eq(canvases.id, canvasId))
+  if (!canvas) return { ok: false, status: 404, error: 'Canvas not found' }
+  if (canvas.userId && canvas.userId !== userId) return { ok: false, status: 403, error: 'Forbidden' }
+  return { ok: true, status: 200, error: null }
+}
+
 export async function GET(req: Request, { params }: Params) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
     const { id } = await params
+    const check = await getOwnedCanvas(id, session.user.id)
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status })
+
     const url = new URL(req.url)
     const offsetMinutes = parseInt(url.searchParams.get('offset') ?? '0')
     const rows = await withRetry(() =>
@@ -24,26 +38,26 @@ export async function GET(req: Request, { params }: Params) {
         ) sub
         ORDER BY local_date DESC, created_at DESC
       `)
-
     )
-    console.log('session-colors GET', { id, rowCount: rows.rows.length, rows: rows.rows })
     const sessions = (rows.rows as { date: string; color: string }[]).map(r => ({
       date: r.date,
       color: r.color,
     }))
     return NextResponse.json({ sessions })
   } catch (error) {
-    console.error('session-colors GET error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch session colors', detail: String(error) },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch session colors', detail: String(error) }, { status: 500 })
   }
 }
 
 export async function PATCH(req: Request, { params }: Params) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
     const { id } = await params
+    const check = await getOwnedCanvas(id, session.user.id)
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status })
+
     const body = await req.json()
     const { date, color } = body as { date?: unknown; color?: unknown }
 
@@ -55,7 +69,6 @@ export async function PATCH(req: Request, { params }: Params) {
     }
 
     const offsetMinutes = typeof body.offset === 'number' ? body.offset : 0
-    // offset is minutes-behind-UTC (e.g. EST = -300), so local midnight = UTC midnight minus offset
     const dayStart = new Date(`${date}T00:00:00Z`)
     dayStart.setUTCMinutes(dayStart.getUTCMinutes() - offsetMinutes)
     const dayEnd = new Date(dayStart)
@@ -81,9 +94,6 @@ export async function PATCH(req: Request, { params }: Params) {
 
     return NextResponse.json({ updated: result })
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to update session colors', detail: String(error) },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to update session colors', detail: String(error) }, { status: 500 })
   }
 }

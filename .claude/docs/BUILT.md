@@ -1,7 +1,7 @@
 # BUILT.md
 
 ## Current State
-Stage 2 complete + post-stage polish. Full persistence layer with Drizzle + Neon. Nodes are only written to DB when the user saves content — never on bare click. State survives refresh via localStorage canvas ID. Canvas settings persisted to localStorage. Subtree copy-as-markdown implemented (Cmd/Ctrl+C or hint bar button).
+Auth + landing + collapsible sidebar complete. NextAuth v5 Google OAuth. Protected canvas routes. Landing page with hero and features grid. Sidebar animates open/closed via Framer Motion, state in SidebarContext, persisted to localStorage. Canvas switching is stable — sidebar stays mounted, reads current canvas from usePathname().
 
 ## Feature Docs
 
@@ -11,7 +11,7 @@ Stage 2 complete + post-stage polish. Full persistence layer with Drizzle + Neon
 | Node Editing | ✅ Built | `docs/features/node-editing.md` |
 | Appearance | ✅ Built | `docs/features/appearance.md` |
 | Persistence | ✅ Built | `docs/features/persistence.md` |
-| Auth + Canvas Management | 🔲 Planned | `docs/features/auth.md` |
+| Auth + Canvas Management | ✅ Built | `docs/features/auth.md` |
 | Voice Input | 🔲 Planned | `docs/features/voice-input.md` |
 | Streak + Activity | 🔲 Planned | `docs/features/streak.md` |
 | Polish + Ship | 🔲 Planned | `docs/features/polish-and-ship.md` |
@@ -21,6 +21,9 @@ Stage 2 complete + post-stage polish. Full persistence layer with Drizzle + Neon
 src/
   app/
     api/
+      auth/
+        [...nextauth]/route.ts
+        post-signin/route.ts
       canvases/
         [id]/
           route.ts
@@ -32,26 +35,42 @@ src/
       nodes/
         [id]/route.ts
         route.ts
+    canvas/
+      [id]/page.tsx
+      layout.tsx
     favicon.ico
     globals.css
     layout.tsx
     page.tsx
   components/
     Canvas.tsx
+    CanvasPage.tsx
     Markdown.tsx
     Markdown/markdown.css
     NodePopover.tsx
     PastSessionsDropdown.tsx
     SettingsPanel.tsx
+    Sidebar.tsx
+    SidebarItem.tsx
+    SidebarToggle.tsx
+    landing/
+      FeaturesGrid.tsx
+      Hero.tsx
+  context/
+    SidebarContext.tsx
   lib/
+    auth.ts
     db.ts
     nearest.ts
     retry.ts
     settings.ts
-    subtree.ts
+    subtree.
+    ts
     sessionColor.ts
+  middleware.ts
   schema/
     index.ts
   types/
     index.ts
+    next-auth.d.ts
 ```
