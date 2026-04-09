@@ -30,6 +30,7 @@ export default function NodePopover({
   onSubtreeSelect,
 }: NodePopoverProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const uploadingRef = useRef(false)
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle')
 
   const screenX = node.x * transform.k + transform.x
@@ -60,12 +61,15 @@ export default function NodePopover({
     async function handlePaste(e: ClipboardEvent) {
       const items = e.clipboardData?.items
       if (!items) return
+      let handled = false
       for (const item of Array.from(items)) {
-        if (item.type.startsWith('image/')) {
+        if (!handled && item.type.startsWith('image/')) {
+          handled = true
           e.preventDefault()
           const file = item.getAsFile()
           if (!file) return
           setUploadStatus('uploading')
+          uploadingRef.current = true
           try {
             const compressed = await compressImage(file)
             const res = await fetch('/api/upload', {
@@ -81,6 +85,7 @@ export default function NodePopover({
             onClose()
           } catch {
             setUploadStatus('error')
+            uploadingRef.current = false
           }
           return
         }
@@ -92,6 +97,7 @@ export default function NodePopover({
   }, [node.id, onSave, onClose])
 
   function commit(fromBlur = false) {
+    if (uploadingRef.current) return
     const text = textareaRef.current?.value ?? ''
     if (text.trim() === '' && node.text === null) {
       if (fromBlur) {
@@ -154,6 +160,7 @@ export default function NodePopover({
   }
 
   function handleBlur() {
+    if (uploadingRef.current) return
     commit(true)
   }
 
