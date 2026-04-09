@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import * as d3 from 'd3'
 import type { Node, Edge } from '@/types'
 import type { CanvasSettings } from '@/lib/settings'
+import { isImageUrl } from '@/lib/isImageUrl'
 
 interface CanvasProps {
   nodes: Node[]
@@ -203,35 +204,76 @@ export default function Canvas({
       .attr('stroke', s.nodeColor)
       .attr('stroke-opacity', (d) => (selectedNodeIds.has(d.id) ? 0.8 : 0))
 
-    allNodes.each(function(d) {
-      const t = d.text ?? ''
-      const stripped = t.replace(/^#{1,3} /, '')
-      const isH1 = t.startsWith('# ')
-      const isH2 = t.startsWith('## ')
-      const isH3 = t.startsWith('### ')
-      const isQuestion = t.endsWith('?')
+      allNodes.each(function(d) {
+        const el = d3.select(this)
+  
+        if (isImageUrl(d.text)) {
+          // Already rendered — skip entirely to prevent flicker on drag
+          if (!el.select('image').empty()) return
+  
+          // Clean up stale elements before rendering image
+          el.selectAll('clipPath').remove()
+          el.selectAll('image').remove()
+  
+          // Hide text label
+          el.select('text').attr('fill', 'none').selectAll('tspan').remove()
 
-      const fontSize = isH1 ? s.h1Size : isH2 ? s.h2Size : isH3 ? s.h3Size : s.defaultSize
-      const fontWeight = isH1 ? '800' : isH2 ? '700' : isH3 ? '600' : '400'
-      const fill = isQuestion ? s.questionColor : '#e2e8f0'
-      const lineHeight = fontSize * 1.2
+        const imgSrc = d.text!
+        const clipId = `clip-${d.id}`
+        const htmlImg = new window.Image()
+        htmlImg.onload = () => {
+          el.selectAll('clipPath').remove()
+          el.selectAll('image').remove()
+          const w = htmlImg.naturalWidth
+          const h = htmlImg.naturalHeight
+          el.append('clipPath')
+            .attr('id', clipId)
+            .append('rect')
+            .attr('x', 12)
+            .attr('y', 4)
+            .attr('width', w)
+            .attr('height', h)
+            .attr('rx', 6)
+          el.append('image')
+            .attr('href', imgSrc)
+            .attr('x', 12)
+            .attr('y', 4)
+            .attr('width', w)
+            .attr('height', h)
+            .attr('preserveAspectRatio', 'xMidYMid meet')
+            .attr('clip-path', `url(#${clipId})`)
+        }
+        htmlImg.src = imgSrc
+      } else {
+        const t = d.text ?? ''
+        const stripped = t.replace(/^#{1,3} /, '')
+        const isH1 = t.startsWith('# ')
+        const isH2 = t.startsWith('## ')
+        const isH3 = t.startsWith('### ')
+        const isQuestion = t.endsWith('?')
 
-      const lines = wrapText(stripped, s.wrapLength)
-      const textEl = d3.select(this).select<SVGTextElement>('text')
-      textEl.selectAll('tspan').remove()
-      textEl
-        .attr('x', 12)
-        .attr('y', 4)
-        .attr('font-size', `${fontSize}px`)
-        .attr('font-weight', fontWeight)
-        .attr('fill', fill)
+        const fontSize = isH1 ? s.h1Size : isH2 ? s.h2Size : isH3 ? s.h3Size : s.defaultSize
+        const fontWeight = isH1 ? '800' : isH2 ? '700' : isH3 ? '600' : '400'
+        const fill = isQuestion ? s.questionColor : '#e2e8f0'
+        const lineHeight = fontSize * 1.2
 
-      lines.forEach((line, i) => {
-        textEl.append('tspan')
+        const lines = wrapText(stripped, s.wrapLength)
+        const textEl = d3.select(this).select<SVGTextElement>('text')
+        textEl.selectAll('tspan').remove()
+        textEl
           .attr('x', 12)
-          .attr('dy', i === 0 ? 0 : lineHeight)
-          .text(line)
-      })
+          .attr('y', 4)
+          .attr('font-size', `${fontSize}px`)
+          .attr('font-weight', fontWeight)
+          .attr('fill', fill)
+
+        lines.forEach((line, i) => {
+          textEl.append('tspan')
+            .attr('x', 12)
+            .attr('dy', i === 0 ? 0 : lineHeight)
+            .text(line)
+        })
+      }
     })
 
     allNodes
