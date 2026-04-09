@@ -40,12 +40,16 @@
 - `calcDynamicY(text)` — computes child Y as `node.y + Math.ceil(text.length / wrapLength) * defaultSize + shiftEnterIndentY`
 
 
-### Image Nodes (2026-04-09)
-- `src/lib/isImageUrl.ts` — detects image URLs by extension or known host (imgur, unsplash, wikimedia)
-- `Canvas.tsx` `allNodes.each` block: if node text is an image URL, loads via `window.Image()` to get natural dimensions, appends `<clipPath>` + `<image>` at native size with `xMidYMid meet` and rounded corners; early-returns if `<image>` already present to prevent flicker on drag. Else falls through to existing tspan text rendering.
+### Image Nodes + R2 Upload (2026-04-09)
+- `src/lib/isImageUrl.ts` — detects image URLs by extension or known host (imgur, unsplash, wikimedia, *.r2.dev)
+- `Canvas.tsx` allNodes.each: if isImageUrl(d.text), early-return if `<image>` already present (flicker fix), else load via `window.Image()` for natural dimensions, render at x=12 y=4 with clipPath rounded corners
+- `NodePopover.tsx` — paste handler compresses images before upload using browser Canvas API (max 1200px wide, image/webp at 0.85 quality), then POSTs to /api/upload, sets node text to R2 URL, shows uploading/error state
+- `src/app/api/upload/route.ts` — POST endpoint, auth-guarded, uploads to R2 via S3Client, returns { url }
+- `src/app/api/nodes/[id]/route.ts` — DELETE handler now calls DeleteObjectCommand to clean up R2 objects when an image node is deleted
 
 ## Key Files
 - `src/components/NodePopover.tsx` — popover UI + all keyboard handling
 - `src/app/page.tsx` — `onSave`, `onDiscard`, `onDelete`, `discardedRef`, `suppressNextCreateRef`
-- `src/lib/isImageUrl.ts` — image URL detection
+- `src/lib/isImageUrl.ts` — image URL detection including r2.dev
 - `src/components/Canvas.tsx` — `allNodes.each` block handles image vs text rendering
+- `src/app/api/upload/route.ts` — R2 upload endpoint

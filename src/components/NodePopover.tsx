@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Node } from '@/types'
 import type { CanvasSettings } from '@/lib/settings'
 
@@ -30,6 +30,7 @@ export default function NodePopover({
   onSubtreeSelect,
 }: NodePopoverProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle')
 
   const screenX = node.x * transform.k + transform.x
   const screenY = node.y * transform.k + transform.y
@@ -37,6 +38,58 @@ export default function NodePopover({
   useEffect(() => {
     textareaRef.current?.focus()
   }, [node.id])
+
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    async function compressImage(file: File): Promise<Blob> {
+      const bitmap = await createImageBitmap(file)
+      const MAX_WIDTH = 1200
+      const scale = bitmap.width > MAX_WIDTH ? MAX_WIDTH / bitmap.width : 1
+      const w = Math.round(bitmap.width * scale)
+      const h = Math.round(bitmap.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(bitmap, 0, 0, w, h)
+      return new Promise((resolve) => canvas.toBlob((b) => resolve(b!), 'image/webp', 0.85))
+    }
+
+    async function handlePaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (!file) return
+          setUploadStatus('uploading')
+          try {
+            const compressed = await compressImage(file)
+            const res = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'image/webp' },
+              body: compressed,
+            })
+            const data = await res.json() as { url?: string; error?: string }
+            if (!res.ok || !data.url) throw new Error(data.error ?? 'Upload failed')
+            if (textareaRef.current) textareaRef.current.value = data.url
+            setUploadStatus('idle')
+            await onSave(node.id, data.url)
+            onClose()
+          } catch {
+            setUploadStatus('error')
+          }
+          return
+        }
+      }
+    }
+
+    textarea.addEventListener('paste', handlePaste)
+    return () => textarea.removeEventListener('paste', handlePaste)
+  }, [node.id, onSave, onClose])
 
   function commit(fromBlur = false) {
     const text = textareaRef.current?.value ?? ''
@@ -135,6 +188,12 @@ export default function NodePopover({
         placeholder="Type something…"
         className="w-full bg-transparent px-3 py-1 text-sm text-slate-100 placeholder-slate-500 resize-none outline-none"
       />
+      {uploadStatus === 'uploading' && (
+        <p className="px-3 pb-1 text-xs text-slate-400">Uploading…</p>
+      )}
+      {uploadStatus === 'error' && (
+        <p className="px-3 pb-1 text-xs text-red-400">Upload failed</p>
+      )}
       <div className="flex px-1">
         <button
           onMouseDown={(e) => e.preventDefault()}

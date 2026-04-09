@@ -1,5 +1,5 @@
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|svg|avif)(\?.*)?$/i
-const IMAGE_HOSTS = /^https?:\/\/(i\.imgur\.com|imgur\.com|images\.unsplash\.com|upload\.wikimedia\.org)/i
+const IMAGE_HOSTS = /^https?:\/\/(i\.imgur\.com|imgur\.com|images\.unsplash\.com|upload\.wikimedia\.org|[a-z0-9-]+\.r2\.dev)/i
 
 export function isImageUrl(text: string | null | undefined): boolean {
   if (!text) return false
