@@ -40,6 +40,12 @@
 - `calcDynamicY(text)` — computes child Y as `node.y + Math.ceil(text.length / wrapLength) * defaultSize + shiftEnterIndentY`
 
 
+### Image Nodes (2026-04-09)
+- `src/lib/isImageUrl.ts` — detects image URLs by extension or known host (imgur, unsplash, wikimedia)
+- `Canvas.tsx` `allNodes.each` block: if node text is an image URL, loads via `window.Image()` to get natural dimensions, appends `<clipPath>` + `<image>` at native size with `xMidYMid meet` and rounded corners; early-returns if `<image>` already present to prevent flicker on drag. Else falls through to existing tspan text rendering.
+
 ## Key Files
 - `src/components/NodePopover.tsx` — popover UI + all keyboard handling
 - `src/app/page.tsx` — `onSave`, `onDiscard`, `onDelete`, `discardedRef`, `suppressNextCreateRef`
+- `src/lib/isImageUrl.ts` — image URL detection
+- `src/components/Canvas.tsx` — `allNodes.each` block handles image vs text rendering
