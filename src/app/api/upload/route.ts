@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (!blob || blob.size === 0) return NextResponse.json({ error: 'No file' }, { status: 400 })
 
     const ext = blob.type.split('/')[1] ?? 'png'
-    const key = `${createId()}.${ext}`
+    const key = `${session.user.id}/${createId()}.${ext}`
 
     await s3.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
